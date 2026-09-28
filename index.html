@@ -13,6 +13,9 @@
       下 60px をクロップ（Alt+ドラッグ or フィルタ「クロップ」）し、「対話」から操作する
     - overlay.html?game=0     … 左枠を透明な「穴」にする（下に雀魂のウィンドウキャプチャ等を置く）
     - overlay.html?url=...    … iframe に読み込むURLを変更
+    2枚重ね（実況解説枠の中にも背景を出す）
+    - overlay.html?layer=front … 背景なし（枠・ロゴ・雀魂・下帯・操作ボタン）→ カメラより上
+    - overlay.html?layer=back  … 動く背景だけ → カメラより下（一番下）
   */
   :root {
     --blue-deep: #0b1fb8;
@@ -99,6 +102,11 @@
   }
   #controls .sep { width: 2px; height: 36px; background: #555; margin: 0 10px; }
   #controls button.active { background: #d44; outline: 2px solid #fff; }
+
+  /* ===== 2枚重ねモード ===== */
+  body.layer-front #bg { display: none; }
+  body.layer-back #stage > :not(#bg), body.layer-back #controls { display: none; }
+  body.layer-back #bg { -webkit-mask-image: none; mask-image: none; }
 
   /* ===== 背景 ===== */
   /* 雀魂枠・実況解説枠の内側は背景を抜いて透明にする（下のレイヤーの映像が見える） */
@@ -236,7 +244,9 @@
 const params = new URLSearchParams(location.search);
 const GAME_URL = params.get('url') || 'https://game.mahjongsoul.com/';
 if (params.get('game') === '0') document.body.classList.add('hole');
-else document.getElementById('gameFrame').src = GAME_URL;
+const LAYER = params.get('layer');   // 'front' | 'back' | null
+if (LAYER) document.body.classList.add('layer-' + LAYER);
+else if (LAYER !== 'back') document.getElementById('gameFrame').src = GAME_URL;
 
 /* ---------- 画面フィット（OBSは1920x1080なら等倍） ---------- */
 function fit() {
@@ -334,7 +344,7 @@ function frame(now) {
 
   requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
+if (LAYER !== 'front') requestAnimationFrame(frame); // 前面レイヤーは星を描かない
 </script>
 </body>
 </html>
