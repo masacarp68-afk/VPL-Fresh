@@ -246,7 +246,7 @@ const GAME_URL = params.get('url') || 'https://game.mahjongsoul.com/';
 if (params.get('game') === '0') document.body.classList.add('hole');
 const LAYER = params.get('layer');   // 'front' | 'back' | null
 if (LAYER) document.body.classList.add('layer-' + LAYER);
-else if (LAYER !== 'back') document.getElementById('gameFrame').src = GAME_URL;
+if (params.get('game') !== '0' && LAYER !== 'back') document.getElementById('gameFrame').src = GAME_URL;
 
 /* ---------- 画面フィット（OBSは1920x1080なら等倍） ---------- */
 function fit() {
