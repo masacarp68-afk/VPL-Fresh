@@ -15,6 +15,9 @@
     2枚重ね（実況解説枠の中にも背景を出す）
     - chic.html?layer=front   … 背景なし（枠・雀魂・下帯・操作ボタン）→ カメラより上
     - chic.html?layer=back    … 動く背景だけ → カメラより下（一番下）
+    文字入力（日本語OK）
+    - chic.html?panel=1       … 操作パネルだけ。OBS の「ドック」→「カスタムブラウザドック」に追加して使う
+                                 （入力内容はブラウザソース側へ即反映される）
   */
   :root {
     --gold: #c9a96e;
@@ -160,6 +163,18 @@
   #controls textarea { font: 14px sans-serif; padding: 4px 8px; border: 0; background: #444; color: #fff; resize: none; height: 44px; box-sizing: border-box; }
   #controls input { font: 16px sans-serif; padding: 6px 8px; border: 0; background: #444; color: #fff; }
 
+  /* ===== 操作パネル単体モード（OBSカスタムドック用） ===== */
+  body.panel { background: #1b1b1b; overflow: auto; }
+  body.panel #stage { display: none; }
+  body.panel #root { position: static; width: auto; height: auto; transform: none !important; }
+  body.panel #controls {
+    position: static; width: auto; height: auto; padding: 14px;
+    flex-direction: column; align-items: stretch; gap: 8px; font-size: 15px;
+  }
+  body.panel #controls input, body.panel #controls textarea { width: 100%; box-sizing: border-box; font-size: 16px; }
+  body.panel #controls textarea { height: 120px; }
+  body.panel #controls button { align-self: flex-start; }
+
   /* ===== 2枚重ねモード ===== */
   body.layer-front #bg { display: none; }
   body.layer-back #stage > :not(#bg), body.layer-back #controls { display: none; }
@@ -221,12 +236,14 @@
 const params = new URLSearchParams(location.search);
 const GAME_URL = params.get('url') || 'https://game.mahjongsoul.com/';
 const LAYER = params.get('layer');   // 'front' | 'back' | null
+const PANEL = params.get('panel') === '1';
+if (PANEL) document.body.classList.add('panel');
 if (params.get('game') === '0') document.body.classList.add('hole');
 if (LAYER) document.body.classList.add('layer-' + LAYER);
-if (params.get('game') !== '0' && LAYER !== 'back') document.getElementById('gameFrame').src = GAME_URL;
+if (params.get('game') !== '0' && LAYER !== 'back' && !PANEL) document.getElementById('gameFrame').src = GAME_URL;
 
 /* ---------- 画面フィット（横幅基準） ---------- */
-function fit() { document.getElementById('root').style.transform = `scale(${innerWidth / 1920})`; }
+function fit() { if (PANEL) return; document.getElementById('root').style.transform = `scale(${innerWidth / 1920})`; }
 addEventListener('resize', fit); fit();
 
 /* ---------- 下帯・ラベル ---------- */
@@ -244,20 +261,32 @@ function save(k, v) { try { localStorage.setItem('chic_' + k, v); } catch (e) {}
 for (const id in outMap) {
   const input = document.getElementById(id), out = document.getElementById(outMap[id]);
   input.value = load(id, defaults[id]);
-  const apply = () => {
-    out.textContent = input.value; save(id, input.value);
-  };
-  input.oninput = apply; apply();
+  out.textContent = input.value;
+  input.oninput = () => { out.textContent = input.value; save(id, input.value); notify(); };
 }
 const band = document.getElementById('band'), bandBtn = document.getElementById('bandToggle');
-function setBand(show) {
+function setBand(show, persist = true) {
   band.classList.toggle('hide', !show);
   bandBtn.classList.toggle('active', show);
   bandBtn.textContent = show ? '表示中' : '非表示';
-  save('band', show ? '1' : '0');
+  if (persist) { save('band', show ? '1' : '0'); notify(); }
 }
 bandBtn.onclick = () => setBand(band.classList.contains('hide'));
-setBand(load('band', '1') === '1');
+setBand(load('band', '1') === '1', false);
+
+/* ---------- 他のページ（OBSドックの操作パネル等）からの変更を反映 ---------- */
+function refresh() {
+  for (const id in outMap) {
+    const input = document.getElementById(id), v = load(id, defaults[id]);
+    if (document.activeElement !== input) input.value = v;
+    document.getElementById(outMap[id]).textContent = v;
+  }
+  setBand(load('band', '1') === '1', false);
+}
+let bc = null;
+try { bc = new BroadcastChannel('chic-overlay'); bc.onmessage = refresh; } catch (e) {}
+function notify() { if (bc) bc.postMessage('update'); }
+addEventListener('storage', e => { if (!e.key || e.key.startsWith('chic_')) refresh(); });
 
 /* ---------- 金色の粒子（ゆっくり上昇） ---------- */
 const cv = document.getElementById('dust');
@@ -283,7 +312,7 @@ function frame(now) {
   }
   requestAnimationFrame(frame);
 }
-if (LAYER !== 'front') requestAnimationFrame(frame); // 前面レイヤーは粒子を描かない
+if (LAYER !== 'front' && !PANEL) requestAnimationFrame(frame); // 前面レイヤーは粒子を描かない
 </script>
 </body>
 </html>
