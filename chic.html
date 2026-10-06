@@ -36,12 +36,12 @@
     -webkit-mask:
       linear-gradient(#000,#000),
       linear-gradient(#000,#000) 50px 62px / 1424px 801px no-repeat,
-      linear-gradient(#000,#000) 1522px 62px / 368px 801px no-repeat;
+      linear-gradient(#000,#000) 1522px 62px / 368px 276px no-repeat;
     -webkit-mask-composite: xor;
     mask:
       linear-gradient(#000,#000),
       linear-gradient(#000,#000) 50px 62px / 1424px 801px no-repeat,
-      linear-gradient(#000,#000) 1522px 62px / 368px 801px no-repeat;
+      linear-gradient(#000,#000) 1522px 62px / 368px 276px no-repeat;
     mask-composite: exclude;
   }
   .glow {
@@ -99,13 +99,7 @@
   @keyframes shine { 0% { transform: translateX(0); opacity: 0; } 10%, 90% { opacity: 1; } 100% { transform: translateX(var(--run)); opacity: 0; } }
 
   #frameGame { left: 50px; top: 62px; width: 1424px; height: 801px; --run: 1204px; }
-  #frameCast { left: 1522px; top: 62px; width: 368px; height: 801px; --run: 148px; }
-  .castLabel {
-    position: absolute; left: 50%; bottom: -24px; transform: translateX(-50%); z-index: 2;
-    padding: 6px 28px; white-space: nowrap;
-    background: #0b0d12; border: 1px solid var(--gold);
-    font-size: 24px; font-weight: 800; letter-spacing: 6px; color: var(--text);
-  }
+  #frameCast { left: 1522px; top: 62px; width: 368px; height: 276px; --run: 148px; }
 
   /* ===== 下帯 ===== */
   #band {
@@ -174,7 +168,6 @@
   <div class="frame" id="frameCast">
     <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
     <i class="shine"></i><i class="shine bottom"></i>
-    <div class="castLabel" id="castLabel"></div>
   </div>
 
   <div id="band">
@@ -193,8 +186,6 @@
   <input id="inSub" size="14" placeholder="小見出し">
   <input id="inTitle" size="20" placeholder="メイン">
   <input id="inTicker" size="50" placeholder="流れる文字">
-  　枠ラベル：
-  <input id="inCast" size="10" placeholder="実況・解説">
 </div>
 </div>
 
@@ -216,10 +207,9 @@ const defaults = {
   inTag: 'NEXT MATCH',
   inSub: '予選 第1試合',
   inTitle: 'まもなく対局開始',
-  inTicker: 'ご視聴ありがとうございます　／　対局開始までしばらくお待ちください',
-  inCast: '実況・解説'
+  inTicker: 'ご視聴ありがとうございます　／　対局開始までしばらくお待ちください'
 };
-const outMap = { inTag: 'bandTag', inSub: 'bandSub', inTitle: 'bandTitle', inTicker: 'bandTicker', inCast: 'castLabel' };
+const outMap = { inTag: 'bandTag', inSub: 'bandSub', inTitle: 'bandTitle', inTicker: 'bandTicker' };
 function load(k, d) { try { return localStorage.getItem('chic_' + k) ?? d; } catch (e) { return d; } }
 function save(k, v) { try { localStorage.setItem('chic_' + k, v); } catch (e) {} }
 for (const id in outMap) {
@@ -227,7 +217,6 @@ for (const id in outMap) {
   input.value = load(id, defaults[id]);
   const apply = () => {
     out.textContent = input.value; save(id, input.value);
-    if (id === 'inCast') out.style.display = input.value ? '' : 'none';
   };
   input.oninput = apply; apply();
 }
