@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>VPL Overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Shippori+Mincho+B1:wght@600;800&display=swap" rel="stylesheet">
+<style>
+  /*
+    使い方（OBS ブラウザソース 1920x1080）
+    - vpl.html               … 右上の枠に雀魂を表示（雀魂は内部 1920x1080 で描画して縮小）
+    - vpl.html?game=0        … 雀魂枠を透明にする（下に雀魂のウィンドウキャプチャ等を置く）
+    - vpl.html?url=...       … iframe に読み込むURLを変更
+    - 操作ボタンは 1080px より下（ソース高さ 1140 + 下 60px クロップで「対話」から操作）
+    2枚重ね（実況・解説の立ち絵の後ろに背景を出す）
+    - vpl.html?layer=front   … 背景なし（枠・パネル・ラベル・雀魂）→ カメラより上
+    - vpl.html?layer=back    … 動く背景だけ → カメラより下（一番下）
+    文字入力（日本語OK）
+    - vpl.html?panel=1       … 操作パネルだけ。OBS「ドック」→「カスタムブラウザドック」に追加
+  */
+  :root {
+    --navy: #0f1d4a;
+    --navy-2: #182a66;
+    --blue: #1f56d6;
+    --blue-l: #4f86f0;
+    --gold: #d4b06a;
+    --gold-l: #f0d79c;
+    --paper: #f7f9ff;
+  }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+  #root { position: absolute; left: 0; top: 0; width: 1920px; height: 1140px; transform-origin: 0 0; }
+  #stage {
+    position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden;
+    font-family: "Shippori Mincho B1", serif;
+  }
+  #stage * { box-sizing: border-box; }
+  .deco, .deco * { pointer-events: none; }
+
+  /* ===== 背景 ===== */
+  #bg {
+    position: absolute; inset: 0; overflow: hidden;
+    background: linear-gradient(135deg, #2a63e0 0%, #1a48c2 45%, #10308f 100%);
+  }
+  body.hole:not(.layer-back) #bg {   /* 雀魂枠の穴 */
+    -webkit-mask: linear-gradient(#000,#000), linear-gradient(#000,#000) 550px 32px / 1312px 738px no-repeat;
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000,#000), linear-gradient(#000,#000) 550px 32px / 1312px 738px no-repeat;
+    mask-composite: exclude;
+  }
+  .seigaiha {
+    position: absolute; inset: 0; opacity: .10;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='30'%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.4'%3E%3Ccircle cx='0' cy='0' r='28'/%3E%3Ccircle cx='0' cy='0' r='20'/%3E%3Ccircle cx='0' cy='0' r='12'/%3E%3Ccircle cx='60' cy='0' r='28'/%3E%3Ccircle cx='60' cy='0' r='20'/%3E%3Ccircle cx='60' cy='0' r='12'/%3E%3Ccircle cx='30' cy='15' r='28'/%3E%3Ccircle cx='30' cy='15' r='20'/%3E%3Ccircle cx='30' cy='15' r='12'/%3E%3C/g%3E%3C/svg%3E");
+    animation: wave 60s linear infinite;
+  }
+  @keyframes wave { to { background-position: 120px 60px; } }
+  .sheen {  /* ゆっくり横切る光 */
+    position: absolute; top: -20%; left: -40%; width: 40%; height: 140%;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,.10), transparent);
+    transform: skewX(-15deg);
+    animation: sheen 14s ease-in-out infinite;
+  }
+  @keyframes sheen { 0% { left: -40%; } 60%, 100% { left: 120%; } }
+
+  /* 実況・解説エリアの背景（背景レイヤーに含める） */
+  #stripArt {
+    position: absolute; left: 504px; top: 804px; width: 1404px; height: 264px; overflow: hidden;
+    background: linear-gradient(180deg, #ffffff 0%, #e6eeff 70%, #cfdcfb 100%);
+  }
+  #stripArt .ichimatsu {
+    position: absolute; inset: 0; opacity: .5;
+    background: repeating-conic-gradient(rgba(79,134,240,.10) 0 25%, transparent 0 50%) 0 0 / 44px 44px;
+    -webkit-mask: linear-gradient(180deg, #000 0%, transparent 85%);
+    mask: linear-gradient(180deg, #000 0%, transparent 85%);
+  }
+  #stripArt .waves {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 90px; opacity: .55;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='30'%3E%3Cg fill='none' stroke='%231f56d6' stroke-width='2'%3E%3Ccircle cx='0' cy='30' r='28'/%3E%3Ccircle cx='0' cy='30' r='19'/%3E%3Ccircle cx='0' cy='30' r='10'/%3E%3Ccircle cx='60' cy='30' r='28'/%3E%3Ccircle cx='60' cy='30' r='19'/%3E%3Ccircle cx='60' cy='30' r='10'/%3E%3Ccircle cx='30' cy='15' r='28'/%3E%3Ccircle cx='30' cy='15' r='19'/%3E%3Ccircle cx='30' cy='15' r='10'/%3E%3C/g%3E%3C/svg%3E");
+    -webkit-mask: linear-gradient(0deg, #000 30%, transparent);
+    mask: linear-gradient(0deg, #000 30%, transparent);
+    animation: wave2 50s linear infinite;
+  }
+  @keyframes wave2 { to { background-position: 240px 0; } }
+  .kumo { position: absolute; }
+  .kumo.a { animation: kumo 22s ease-in-out infinite alternate; }
+  .kumo.b { animation: kumo 28s ease-in-out infinite alternate-reverse; }
+  @keyframes kumo { to { transform: translateX(40px); } }
+  #petals { position: absolute; inset: 0; }
+
+  /* ===== 雀魂枠 ===== */
+  #gFill {  /* 紺色の地（雀魂の部分は穴） */
+    position: absolute; left: 504px; top: 12px; width: 1404px; height: 778px;
+    background: radial-gradient(ellipse at 50% 40%, #1d2f70, var(--navy) 75%);
+    -webkit-mask: linear-gradient(#000,#000), linear-gradient(#000,#000) 46px 20px / 1312px 738px no-repeat;
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000,#000), linear-gradient(#000,#000) 46px 20px / 1312px 738px no-repeat;
+    mask-composite: exclude;
+  }
+  #gBorder {
+    position: absolute; left: 504px; top: 12px; width: 1404px; height: 778px;
+    border: 5px solid var(--blue); outline: 2px solid rgba(255,255,255,.85); outline-offset: -9px;
+    box-shadow: 0 6px 24px rgba(0,10,60,.45);
+  }
+  #game { position: absolute; left: 550px; top: 32px; width: 1312px; height: 738px; overflow: hidden; background: #000; }
+  #game iframe {   /* 雀魂は 1920x1080 で描画して 1312x738 に縮小 */
+    width: 1920px; height: 1080px; border: 0; display: block;
+    transform: scale(0.683333); transform-origin: 0 0;
+  }
+  body.hole #game { display: none; }
+  #gGold {  /* 金の二重線 */
+    position: absolute; left: 541px; top: 23px; width: 1330px; height: 756px;
+    border: 4px double var(--gold);
+  }
+  .bracket { position: absolute; width: 30px; height: 30px; border: 0 solid var(--gold); }
+  .bracket::after { content: ""; position: absolute; width: 8px; height: 8px; background: var(--gold); }
+  .bracket.tl { left: -9px; top: -9px; border-left-width: 3px; border-top-width: 3px; }
+  .bracket.tr { right: -9px; top: -9px; border-right-width: 3px; border-top-width: 3px; }
+  .bracket.bl { left: -9px; bottom: -9px; border-left-width: 3px; border-bottom-width: 3px; }
+  .bracket.br { right: -9px; bottom: -9px; border-right-width: 3px; border-bottom-width: 3px; }
+  .bracket.tl::after { left: 4px; top: 4px; } .bracket.tr::after { right: 4px; top: 4px; }
+  .bracket.bl::after { left: 4px; bottom: 4px; } .bracket.br::after { right: 4px; bottom: 4px; }
+  .dia {
+    position: absolute; width: 16px; height: 16px; transform: translate(-50%,-50%) rotate(45deg);
+    background: var(--navy); border: 2px solid var(--gold);
+    box-shadow: 0 0 0 3px var(--navy);
+  }
+  .dia::after { content: ""; position: absolute; inset: 3px; background: var(--gold-l); animation: twinkle 3s ease-in-out infinite; }
+  @keyframes twinkle { 50% { opacity: .35; } }
+  .sakuraCorner { position: absolute; }
+
+  /* ===== 実況・解説 ===== */
+  #stripBorder {
+    position: absolute; left: 504px; top: 804px; width: 1404px; height: 264px;
+    border: 5px solid var(--blue); outline: 1.5px solid var(--gold); outline-offset: -10px;
+  }
+  .castLabel {
+    position: absolute; top: 834px; height: 52px; padding: 0 34px;
+    display: flex; align-items: center; gap: 12px;
+    background: linear-gradient(180deg, var(--navy-2), var(--navy));
+    border: 2px solid var(--gold); border-radius: 26px;
+    box-shadow: 0 4px 12px rgba(0,20,80,.35), inset 0 0 0 3px var(--navy), inset 0 0 0 4px rgba(212,176,106,.5);
+    color: #fff; font-size: 28px; font-weight: 800; letter-spacing: 8px; white-space: nowrap;
+  }
+  .castLabel svg { flex: none; }
+  #labelL { left: 560px; }
+  #labelR { right: 68px; flex-direction: row-reverse; }
+
+  /* ===== 左カラム ===== */
+  .card {
+    position: absolute; left: 12px; width: 476px; overflow: hidden;
+    background: linear-gradient(160deg, #ffffff 0%, var(--paper) 60%, #e9f0ff 100%);
+    border: 4px solid var(--blue); box-shadow: 0 6px 20px rgba(0,10,60,.35);
+  }
+  #titleBox { top: 12px; height: 146px; display: flex; align-items: center; justify-content: center; }
+  #titleBox .brush {
+    position: absolute; left: -30px; top: -10px; width: 140px; height: 20px; background: var(--blue);
+    transform: rotate(-38deg); transform-origin: left top; box-shadow: 18px 26px 0 -4px var(--blue-l), 34px 52px 0 -8px rgba(79,134,240,.6);
+  }
+  #titleText {
+    position: relative; font-size: 62px; font-weight: 800; color: var(--navy);
+    letter-spacing: 2px; white-space: nowrap; text-shadow: 2px 2px 0 rgba(212,176,106,.35);
+  }
+  #infoCard { top: 170px; height: 826px; padding: 40px 38px; }
+  #infoCard::before {  /* 麻の葉っぽい淡い模様 */
+    content: ""; position: absolute; inset: 0; opacity: .5;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='28'%3E%3Cg fill='none' stroke='%231f56d6' stroke-opacity='.10' stroke-width='1'%3E%3Cpath d='M0 0L24 14L48 0M0 28L24 14L48 28M24 0V28'/%3E%3C/g%3E%3C/svg%3E");
+  }
+  #infoHead {
+    position: relative; font-size: 40px; font-weight: 800; color: var(--navy); letter-spacing: 4px;
+    padding-bottom: 14px; margin-bottom: 26px;
+  }
+  #infoHead::after {
+    content: ""; position: absolute; left: 0; bottom: 0; width: 100%; height: 3px;
+    background: linear-gradient(90deg, var(--gold), var(--gold-l) 50%, transparent);
+  }
+  #infoBody {
+    position: relative; font-size: 30px; font-weight: 600; color: #1b2a5c;
+    line-height: 1.75; letter-spacing: 1px; white-space: pre-wrap;
+  }
+  #footBox { top: 1006px; height: 62px; display: flex; align-items: center; padding: 0 22px; }
+  #footText { font-size: 30px; font-weight: 800; color: var(--navy); letter-spacing: 2px; white-space: nowrap; }
+  .leftFill { transition: opacity .5s ease; }
+  body.left-off .leftFill { opacity: 0; }
+
+  /* ===== 操作パネル（1080px より下 = 配信には映らない） ===== */
+  #controls {
+    position: absolute; left: 0; top: 1080px; width: 1920px; height: 60px;
+    background: #222; display: flex; align-items: center; gap: 8px; padding: 0 16px;
+    box-sizing: border-box; font: 700 17px sans-serif; color: #ccc;
+  }
+  #controls button { font: 700 17px sans-serif; color: #fff; background: #555; border: 0; padding: 8px 14px; cursor: pointer; }
+  #controls button.active { background: #2a5bd0; outline: 2px solid #fff; }
+  #controls input { font: 15px sans-serif; padding: 6px 8px; border: 0; background: #444; color: #fff; }
+  #controls textarea { font: 13px sans-serif; padding: 4px 8px; border: 0; background: #444; color: #fff; resize: none; height: 44px; box-sizing: border-box; }
+
+  /* 操作パネル単体モード（OBSカスタムドック用） */
+  body.panel { background: #1b1b1b; overflow: auto; }
+  body.panel #stage { display: none; }
+  body.panel #root { position: static; width: auto; height: auto; transform: none !important; }
+  body.panel #controls { position: static; width: auto; height: auto; padding: 14px; flex-direction: column; align-items: stretch; gap: 8px; }
+  body.panel #controls input, body.panel #controls textarea { width: 100%; font-size: 16px; }
+  body.panel #controls textarea { height: 140px; }
+  body.panel #controls button { align-self: flex-start; }
+
+  /* ===== 2枚重ねモード ===== */
+  body.layer-front #bg { display: none; }
+  body.layer-back #stage > :not(#bg), body.layer-back #controls { display: none; }
+</style>
+</head>
+<body>
+<div id="root">
+<div id="stage">
+  <!-- 背景（layer=back はここだけ） -->
+  <div id="bg" class="deco">
+    <div class="seigaiha"></div>
+    <div class="sheen"></div>
+    <div id="stripArt">
+      <div class="ichimatsu"></div>
+      <div class="waves"></div>
+      <div class="kumo a" data-kumo style="left:70px; top:150px;"></div>
+      <div class="kumo b" data-kumo style="left:1180px; top:120px;"></div>
+      <div class="kumo a" data-kumo style="left:560px; top:20px; opacity:.6"></div>
+    </div>
+    <canvas id="petals" width="1920" height="1080"></canvas>
+  </div>
+
+  <!-- 雀魂枠 -->
+  <div id="gFill" class="deco"></div>
+  <div id="game"><iframe id="gameFrame" allow="autoplay; fullscreen; clipboard-read; clipboard-write" allowfullscreen></iframe></div>
+  <div id="gBorder" class="deco"></div>
+  <div id="gGold" class="deco">
+    <i class="bracket tl"></i><i class="bracket tr"></i><i class="bracket bl"></i><i class="bracket br"></i>
+  </div>
+  <div class="deco">
+    <i class="dia" style="left:1206px; top:25px;"></i>
+    <i class="dia" style="left:1206px; top:777px;"></i>
+    <i class="dia" style="left:543px; top:401px;"></i>
+    <i class="dia" style="left:1869px; top:401px;"></i>
+  </div>
+  <div class="sakuraCorner deco" data-sakura="tl" style="left:494px; top:2px;"></div>
+  <div class="sakuraCorner deco" data-sakura="br" style="left:1846px; top:740px;"></div>
+
+  <!-- 実況・解説 -->
+  <div id="stripBorder" class="deco"></div>
+  <div class="castLabel deco" id="labelL"><span id="labelLText"></span></div>
+  <div class="castLabel deco" id="labelR"><span id="labelRText"></span></div>
+
+  <!-- 左カラム -->
+  <div class="card deco" id="titleBox"><i class="brush"></i><div id="titleText"></div></div>
+  <div class="card deco leftFill" id="infoCard">
+    <div id="infoHead"></div>
+    <div id="infoBody"></div>
+  </div>
+  <div class="card deco leftFill" id="footBox"><div id="footText"></div></div>
+</div>
+<div id="controls">
+  タイトル：<input id="inTitle" size="12">
+  左パネル：<button id="leftToggle" class="active">表示中</button>
+  <input id="inHead" size="10" placeholder="見出し">
+  <textarea id="inBody" rows="2" cols="36" placeholder="本文（改行可）"></textarea>
+  <input id="inFoot" size="14" placeholder="下の小枠">
+  ラベル：<input id="inLabelL" size="6" placeholder="左"><input id="inLabelR" size="6" placeholder="右">
+</div>
+</div>
+
+<script>
+/* ---------- 設定 ---------- */
+const params = new URLSearchParams(location.search);
+const GAME_URL = params.get('url') || 'https://game.mahjongsoul.com/';
+const LAYER = params.get('layer');   // 'front' | 'back' | null
+const PANEL = params.get('panel') === '1';
+if (PANEL) document.body.classList.add('panel');
+if (params.get('game') === '0') document.body.classList.add('hole');
+if (LAYER) document.body.classList.add('layer-' + LAYER);
+if (params.get('game') !== '0' && LAYER !== 'back' && !PANEL) document.getElementById('gameFrame').src = GAME_URL;
+
+/* ---------- 画面フィット（横幅基準） ---------- */
+function fit() { if (PANEL) return; document.getElementById('root').style.transform = `scale(${innerWidth / 1920})`; }
+addEventListener('resize', fit); fit();
+
+/* ---------- 装飾（桜・霞） ---------- */
+function flower(size, color, rot = 0) {
+  let petals = '';
+  for (let i = 0; i < 5; i++) {
+    petals += `<ellipse cx="0" cy="-${size * 0.27}" rx="${size * 0.2}" ry="${size * 0.28}" fill="${color}" transform="rotate(${i * 72 + rot})"/>`;
+  }
+  return `<g>${petals}<circle r="${size * 0.09}" fill="#fff6d8"/></g>`;
+}
+function sakuraCluster(kind) {
+  const list = kind === 'tl'
+    ? [[22, 22, 30, '#c9b3ec'], [52, 14, 22, '#e3c6f0'], [16, 52, 22, '#b9a3e6'], [46, 42, 16, '#f3d3ea']]
+    : [[50, 52, 30, '#c9b3ec'], [20, 60, 22, '#e3c6f0'], [58, 22, 22, '#b9a3e6'], [28, 30, 16, '#f3d3ea']];
+  return `<svg width="76" height="76" viewBox="0 0 76 76">${
+    list.map(([x, y, s, c], i) => `<g transform="translate(${x},${y})">${flower(s, c, i * 17)}</g>`).join('')
+  }</svg>`;
+}
+document.querySelectorAll('[data-sakura]').forEach(el => el.innerHTML = sakuraCluster(el.dataset.sakura));
+const icon = `<svg width="26" height="26" viewBox="-13 -13 26 26">${flower(26, '#f0d79c')}</svg>`;
+document.getElementById('labelL').insertAdjacentHTML('beforeend', icon);
+document.getElementById('labelR').insertAdjacentHTML('beforeend', icon);
+const kumoSvg = `<svg width="260" height="52"><defs><linearGradient id="kg" x1="0" x2="1"><stop offset="0" stop-color="#e9cf8f"/><stop offset="1" stop-color="#c49a4c"/></linearGradient></defs>
+  <g fill="url(#kg)"><rect x="0" y="0" width="150" height="12" rx="6"/><rect x="50" y="20" width="210" height="12" rx="6"/><rect x="20" y="40" width="120" height="12" rx="6"/></g></svg>`;
+document.querySelectorAll('[data-kumo]').forEach(el => el.innerHTML = kumoSvg);
+
+/* ---------- テキスト ---------- */
+const defaults = {
+  inTitle: 'VPL第1節',
+  inHead: '本日の対局',
+  inBody: 'ここに自由に\nテキストを書けます\n\n（操作パネルで編集・改行可）',
+  inFoot: 'まもなく開始',
+  inLabelL: '実況',
+  inLabelR: '解説'
+};
+const outMap = { inTitle: 'titleText', inHead: 'infoHead', inBody: 'infoBody', inFoot: 'footText', inLabelL: 'labelLText', inLabelR: 'labelRText' };
+function load(k, d) { try { return localStorage.getItem('vpl_' + k) ?? d; } catch (e) { return d; } }
+function save(k, v) { try { localStorage.setItem('vpl_' + k, v); } catch (e) {} }
+for (const id in outMap) {
+  const input = document.getElementById(id), out = document.getElementById(outMap[id]);
+  input.value = load(id, defaults[id]);
+  out.textContent = input.value;
+  input.oninput = () => { out.textContent = input.value; save(id, input.value); notify(); };
+}
+const leftBtn = document.getElementById('leftToggle');
+function setLeft(show, persist = true) {
+  document.body.classList.toggle('left-off', !show);
+  leftBtn.classList.toggle('active', show);
+  leftBtn.textContent = show ? '表示中' : '非表示';
+  if (persist) { save('left', show ? '1' : '0'); notify(); }
+}
+leftBtn.onclick = () => setLeft(document.body.classList.contains('left-off'));
+setLeft(load('left', '1') === '1', false);
+
+/* ---------- 他のページ（OBSドックの操作パネル等）からの変更を反映 ---------- */
+function refresh() {
+  for (const id in outMap) {
+    const input = document.getElementById(id), v = load(id, defaults[id]);
+    if (document.activeElement !== input) input.value = v;
+    document.getElementById(outMap[id]).textContent = v;
+  }
+  setLeft(load('left', '1') === '1', false);
+}
+let bc = null;
+try { bc = new BroadcastChannel('vpl-overlay'); bc.onmessage = refresh; } catch (e) {}
+function notify() { if (bc) bc.postMessage('update'); }
+addEventListener('storage', e => { if (!e.key || e.key.startsWith('vpl_')) refresh(); });
+
+/* ---------- 桜の花びら（ゆっくり舞う） ---------- */
+const cv = document.getElementById('petals');
+const ctx = cv.getContext('2d');
+const colors = ['255,214,232', '236,200,245', '255,236,244', '214,196,250'];
+const petals = Array.from({ length: 55 }, () => newPetal(true));
+function newPetal(init) {
+  return {
+    x: Math.random() * 2100 - 100, y: init ? Math.random() * 1080 : -20,
+    s: 6 + Math.random() * 8, vy: 18 + Math.random() * 26, vx: 10 + Math.random() * 18,
+    rot: Math.random() * 6.28, vr: (Math.random() - .5) * 1.6,
+    flip: Math.random() * 6.28, vf: 1 + Math.random() * 2,
+    c: colors[Math.floor(Math.random() * colors.length)], a: .45 + Math.random() * .45
+  };
+}
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  ctx.clearRect(0, 0, 1920, 1080);
+  for (let i = 0; i < petals.length; i++) {
+    const p = petals[i];
+    p.y += p.vy * dt; p.x += (p.vx + Math.sin(p.flip) * 20) * dt;
+    p.rot += p.vr * dt; p.flip += p.vf * dt;
+    if (p.y > 1100 || p.x > 2000) { petals[i] = newPetal(false); continue; }
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(1, Math.abs(Math.cos(p.flip)) * .8 + .2);
+    ctx.fillStyle = `rgba(${p.c},${p.a})`;
+    ctx.beginPath();  // 先が割れた花びら
+    ctx.moveTo(0, p.s);
+    ctx.bezierCurveTo(p.s * .9, p.s * .4, p.s * .7, -p.s * .7, p.s * .2, -p.s);
+    ctx.lineTo(0, -p.s * .7); ctx.lineTo(-p.s * .2, -p.s);
+    ctx.bezierCurveTo(-p.s * .7, -p.s * .7, -p.s * .9, p.s * .4, 0, p.s);
+    ctx.fill(); ctx.restore();
+  }
+  requestAnimationFrame(frame);
+}
+if (LAYER !== 'front' && !PANEL) requestAnimationFrame(frame); // 前面レイヤーは描かない
+</script>
+</body>
+</html>
