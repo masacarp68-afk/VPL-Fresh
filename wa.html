@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Wa Overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Yuji+Syuku&display=swap" rel="stylesheet">
+<style>
+  /*
+    使い方（OBS ブラウザソース 1920x1080）
+    - wa.html                … 左の枠に雀魂を表示（雀魂は内部 1920x1080 で描画して縮小）／カメラ枠3つ
+    - wa.html?cams=2         … カメラ枠2つ（縦に大きめ）
+    - wa.html?game=0         … 雀魂枠を透明にする（下に雀魂のウィンドウキャプチャ等を置く）
+    - wa.html?url=...        … iframe に読み込むURLを変更
+    - 操作ボタンは 1080px より下（ソース高さ 1140 + 下 60px クロップで「対話」から操作）
+    2枚重ね（カメラの後ろにも背景を出す）
+    - wa.html?layer=front    … 背景なし（枠・雀魂・下帯）→ カメラより上
+    - wa.html?layer=back     … 動く背景だけ → カメラより下（一番下）
+    文字入力（日本語OK）
+    - wa.html?panel=1        … 操作パネルだけ。OBS「ドック」→「カスタムブラウザドック」に追加
+  */
+  :root {
+    --ink: #0c0c0e;
+    --red: #c3161c;
+    --red-d: #7d0b0f;
+    --gold: #c9a45c;
+    --gold-l: #ecd49a;
+    --cream: #efe3c4;
+    --teal: #2e6b66;
+  }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+  #root { position: absolute; left: 0; top: 0; width: 1920px; height: 1140px; transform-origin: 0 0; }
+  #stage {
+    position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden;
+    font-family: "Shippori Mincho B1", serif;
+  }
+  #stage * { box-sizing: border-box; }
+  .deco, .deco * { pointer-events: none; }
+
+  /* ===== 背景 ===== */
+  #bg { position: absolute; inset: 0; overflow: hidden; background: radial-gradient(ellipse at 40% 45%, #1b1b1d 0%, var(--ink) 70%); }
+  #bg svg.scene { position: absolute; inset: 0; }
+  .washi {   /* 和紙っぽいザラつき */
+    position: absolute; inset: 0; opacity: .16; mix-blend-mode: screen;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 .9 0 0 0 0 .85 0 0 0 0 .75 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .mist { animation: mist 40s ease-in-out infinite alternate; }
+  .mist.slow { animation-duration: 60s; animation-direction: alternate-reverse; }
+  @keyframes mist { to { transform: translateX(-120px); } }
+  .moon { animation: moon 8s ease-in-out infinite; transform-origin: 1600px 40px; }
+  @keyframes moon { 50% { opacity: .82; } }
+  .kumo { position: absolute; }
+  .kumo.a { animation: kumo 26s ease-in-out infinite alternate; }
+  .kumo.b { animation: kumo 34s ease-in-out infinite alternate-reverse; }
+  @keyframes kumo { to { transform: translateX(46px); } }
+  .brush { animation: brush 9s ease-in-out infinite; }
+  @keyframes brush { 50% { opacity: .78; } }
+  #embers { position: absolute; inset: 0; }
+
+  /* ===== 雀魂枠 ===== */
+  #game { position: absolute; left: 56px; top: 96px; width: 1264px; height: 711px; overflow: hidden; background: #000; }
+  #game iframe {   /* 雀魂は 1920x1080 で描画して 1264x711 に縮小 */
+    width: 1920px; height: 1080px; border: 0; display: block;
+    transform: scale(0.658333); transform-origin: 0 0;
+  }
+  body.hole #game { display: none; }
+
+  /* 金の二重線＋角の組子飾り */
+  .gframe { position: absolute; border: 1.5px solid var(--gold); box-shadow: 0 0 0 5px rgba(0,0,0,.55), 0 0 0 6.5px var(--gold-l), 0 8px 30px rgba(0,0,0,.6); }
+  .gframe::before { content: ""; position: absolute; inset: 4px; border: 1px solid rgba(201,164,92,.55); }
+  .gframe .k { position: absolute; width: 30px; height: 30px; }
+  .gframe .k::before, .gframe .k::after { content: ""; position: absolute; border: 2px solid var(--gold); }
+  .gframe .k::before { inset: 0; border-width: 0; }
+  .gframe .k.tl { left: -12px; top: -12px; } .gframe .k.tr { right: -12px; top: -12px; transform: scaleX(-1); }
+  .gframe .k.bl { left: -12px; bottom: -12px; transform: scaleY(-1); } .gframe .k.br { right: -12px; bottom: -12px; transform: scale(-1); }
+  .gframe .k::before { border-left-width: 2px; border-top-width: 2px; }
+  .gframe .k::after { left: 7px; top: 7px; width: 11px; height: 11px; background: rgba(12,12,14,.9); }
+  .dia {
+    position: absolute; width: 22px; height: 22px; transform: translate(-50%,-50%) rotate(45deg);
+    background: #141416; border: 2px solid var(--gold); box-shadow: 0 0 0 3px #0c0c0e;
+  }
+  .dia::after { content: ""; position: absolute; inset: 5px; border: 1px solid var(--gold-l); }
+
+  /* ===== 下帯（点数表示を出さない時用） ===== */
+  #band {
+    position: absolute; left: 20px; top: 872px; width: 1880px; height: 190px; overflow: hidden;
+    background: linear-gradient(180deg, rgba(20,18,16,.94), rgba(10,10,10,.97));
+    border: 1.5px solid var(--gold); box-shadow: 0 0 0 4px rgba(0,0,0,.6), 0 0 0 5.5px rgba(236,212,154,.6);
+    transition: opacity .5s ease, transform .5s ease;
+  }
+  #band.hide { opacity: 0; transform: translateY(30px); }
+  #band .main { position: relative; height: 136px; display: flex; align-items: center; gap: 34px; padding: 0 48px; }
+  #band .tag {
+    position: relative; z-index: 0; isolation: isolate; font-family: "Yuji Syuku", serif; font-size: 50px; color: #fff; padding: 0 40px; white-space: nowrap;
+    text-shadow: 0 2px 0 rgba(0,0,0,.4);
+  }
+  #band .tag::before {   /* 赤い筆のにじみ */
+    content: ""; position: absolute; inset: -6px -10px; z-index: -1; background: var(--red);
+    clip-path: polygon(3% 18%, 30% 6%, 62% 12%, 97% 4%, 100% 40%, 94% 88%, 66% 96%, 34% 90%, 6% 98%, 0 60%);
+    filter: url(#rough);
+  }
+  #band .sub { font-size: 34px; font-weight: 600; color: var(--gold-l); letter-spacing: 3px; white-space: nowrap; }
+  #band .title { font-family: "Yuji Syuku", serif; font-size: 70px; color: #fff; letter-spacing: 6px; white-space: nowrap; text-shadow: 0 0 18px rgba(195,22,28,.5); }
+  #band .ticker {
+    position: relative; height: 52px; border-top: 1px solid rgba(201,164,92,.4);
+    overflow: hidden; white-space: nowrap;
+  }
+  #band .ticker span {
+    position: absolute; top: 0; line-height: 52px; left: 100%;
+    font-size: 26px; font-weight: 600; color: var(--cream); letter-spacing: 3px;
+    animation: ticker 36s linear infinite;
+  }
+  @keyframes ticker { to { transform: translateX(calc(-100% - 1880px)); } }
+
+  /* ===== 操作パネル（1080px より下 = 配信には映らない） ===== */
+  #controls {
+    position: absolute; left: 0; top: 1080px; width: 1920px; height: 60px;
+    background: #222; display: flex; align-items: center; gap: 8px; padding: 0 16px;
+    box-sizing: border-box; font: 700 17px sans-serif; color: #ccc;
+  }
+  #controls button { font: 700 17px sans-serif; color: #fff; background: #555; border: 0; padding: 8px 14px; cursor: pointer; }
+  #controls button.active { background: #a3171b; outline: 2px solid #fff; }
+  #controls input { font: 15px sans-serif; padding: 6px 8px; border: 0; background: #444; color: #fff; }
+
+  /* 操作パネル単体モード（OBSカスタムドック用） */
+  body.panel { background: #1b1b1b; overflow: auto; }
+  body.panel #stage { display: none; }
+  body.panel #root { position: static; width: auto; height: auto; transform: none !important; }
+  body.panel #controls { position: static; width: auto; height: auto; padding: 14px; flex-direction: column; align-items: stretch; gap: 8px; }
+  body.panel #controls input { width: 100%; font-size: 16px; }
+  body.panel #controls button { align-self: flex-start; }
+
+  /* ===== 2枚重ねモード ===== */
+  body.layer-front #bg { display: none; }
+  body.layer-back #stage > :not(#bg), body.layer-back #controls { display: none; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <filter id="rough"><feTurbulence type="fractalNoise" baseFrequency=".035 .9" numOctaves="3" seed="4"/><feDisplacementMap in="SourceGraphic" scale="14"/></filter>
+</svg>
+<div id="root">
+<div id="stage">
+  <!-- 背景（layer=back はここだけ） -->
+  <div id="bg" class="deco">
+    <svg class="scene" width="1920" height="1080" viewBox="0 0 1920 1080">
+      <defs>
+        <radialGradient id="moonG"><stop offset="0" stop-color="#f3ead2"/><stop offset=".7" stop-color="#e6d7b0"/><stop offset="1" stop-color="#e6d7b0" stop-opacity="0"/></radialGradient>
+        <radialGradient id="moonGlow"><stop offset="0" stop-color="#f3ead2" stop-opacity=".35"/><stop offset="1" stop-color="#f3ead2" stop-opacity="0"/></radialGradient>
+        <linearGradient id="mt1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f8d86"/><stop offset="1" stop-color="#16302e" stop-opacity="0"/></linearGradient>
+        <linearGradient id="mt2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f6560"/><stop offset="1" stop-color="#0e1f1e" stop-opacity="0"/></linearGradient>
+        <radialGradient id="fog"><stop offset="0" stop-color="#d9d2bd" stop-opacity=".2"/><stop offset="1" stop-color="#d9d2bd" stop-opacity="0"/></radialGradient>
+        <filter id="roughBg"><feTurbulence type="fractalNoise" baseFrequency=".02 .6" numOctaves="3" seed="7"/><feDisplacementMap in="SourceGraphic" scale="22"/></filter>
+        <filter id="soft"><feGaussianBlur stdDeviation="2"/></filter>
+      </defs>
+      <!-- 月 -->
+      <g class="moon">
+        <circle cx="1600" cy="40" r="260" fill="url(#moonGlow)"/>
+        <circle cx="1600" cy="40" r="150" fill="url(#moonG)" opacity=".9"/>
+      </g>
+      <!-- 山並み（右側・左下） -->
+      <path id="ridge1" fill="url(#mt1)" opacity=".45" filter="url(#soft)"/>
+      <path id="ridge2" fill="url(#mt2)" opacity=".6" filter="url(#soft)"/>
+      <path id="ridge3" fill="url(#mt2)" opacity=".55" filter="url(#soft)"/>
+      <!-- 霧 -->
+      <g class="mist"><ellipse cx="1550" cy="300" rx="650" ry="70" fill="url(#fog)"/><ellipse cx="1650" cy="560" rx="550" ry="60" fill="url(#fog)"/></g>
+      <g class="mist slow"><ellipse cx="300" cy="760" rx="520" ry="70" fill="url(#fog)"/><ellipse cx="1650" cy="800" rx="460" ry="55" fill="url(#fog)"/></g>
+    </svg>
+    <canvas id="brushes" class="brush" width="1920" height="1080" style="position:absolute;inset:0"></canvas>
+    <!-- 金の霞 -->
+    <div class="kumo a" data-kumo="1" style="left:10px; top:20px;"></div>
+    <div class="kumo b" data-kumo="2" style="left:640px; top:4px;"></div>
+    <div class="kumo a" data-kumo="3" style="left:-30px; top:740px;"></div>
+    <div class="kumo b" data-kumo="1" style="left:1040px; top:780px;"></div>
+    <div class="kumo a" data-kumo="2" style="left:1700px; top:300px;"></div>
+    <div class="kumo b" data-kumo="3" style="left:1730px; top:810px;"></div>
+    <div class="washi"></div>
+    <canvas id="embers" width="1920" height="1080"></canvas>
+  </div>
+
+  <!-- 雀魂 -->
+  <div id="game"><iframe id="gameFrame" allow="autoplay; fullscreen; clipboard-read; clipboard-write" allowfullscreen></iframe></div>
+
+  <!-- 枠（JSで配置） -->
+  <div id="frames" class="deco"></div>
+
+  <!-- 下帯 -->
+  <div id="band" class="deco">
+    <div class="main">
+      <div class="tag" id="bandTag"></div>
+      <div class="sub" id="bandSub"></div>
+      <div class="title" id="bandTitle"></div>
+    </div>
+    <div class="ticker"><span id="bandTicker"></span></div>
+  </div>
+</div>
+<div id="controls">
+  下帯：<button id="bandToggle" class="active">表示中</button>
+  <input id="inTag" size="8" placeholder="札">
+  <input id="inSub" size="14" placeholder="小見出し">
+  <input id="inTitle" size="20" placeholder="メイン">
+  <input id="inTicker" size="60" placeholder="流れる文字">
+</div>
+</div>
+
+<script>
+/* ---------- 設定 ---------- */
+const params = new URLSearchParams(location.search);
+const GAME_URL = params.get('url') || 'https://game.mahjongsoul.com/';
+const LAYER = params.get('layer');   // 'front' | 'back' | null
+const PANEL = params.get('panel') === '1';
+const CAMS = params.get('cams') === '2' ? 2 : 3;
+const HOLE = params.get('game') === '0';
+if (PANEL) document.body.classList.add('panel');
+if (HOLE) document.body.classList.add('hole');
+if (LAYER) document.body.classList.add('layer-' + LAYER);
+if (!HOLE && LAYER !== 'back' && !PANEL) document.getElementById('gameFrame').src = GAME_URL;
+
+/* ---------- 画面フィット（横幅基準） ---------- */
+function fit() { if (PANEL) return; document.getElementById('root').style.transform = `scale(${innerWidth / 1920})`; }
+addEventListener('resize', fit); fit();
+
+/* ---------- レイアウト ---------- */
+const GAME = { x: 56, y: 96, w: 1264, h: 711 };
+const CAM_RECTS = CAMS === 3
+  ? [{ x: 1462, y: 96, w: 400, h: 225 }, { x: 1462, y: 339, w: 400, h: 225 }, { x: 1462, y: 582, w: 400, h: 225 }]
+  : [{ x: 1462, y: 96, w: 400, h: 346 }, { x: 1462, y: 461, w: 400, h: 346 }];
+
+// 枠を描く
+const frames = document.getElementById('frames');
+function addFrame(r, pad, dia) {
+  const f = document.createElement('div');
+  f.className = 'gframe';
+  Object.assign(f.style, { left: r.x - pad + 'px', top: r.y - pad + 'px', width: r.w + pad * 2 + 'px', height: r.h + pad * 2 + 'px' });
+  f.innerHTML = '<i class="k tl"></i><i class="k tr"></i><i class="k bl"></i><i class="k br"></i>';
+  frames.appendChild(f);
+  if (dia) {
+    const d = document.createElement('i');
+    d.className = 'dia';
+    Object.assign(d.style, { left: r.x - pad + 'px', top: r.y + r.h * .72 + 'px' });
+    frames.appendChild(d);
+  }
+}
+addFrame(GAME, 12, false);
+CAM_RECTS.forEach(r => addFrame(r, 10, true));
+
+// 背景の穴（カメラ枠は常に／雀魂枠は game=0 の時）。背景レイヤー単体では穴を開けない
+if (LAYER !== 'back') {
+  const holes = [...CAM_RECTS, ...(HOLE ? [GAME] : [])];
+  const layers = ['linear-gradient(#000,#000)', ...holes.map(r => `linear-gradient(#000,#000) ${r.x}px ${r.y}px / ${r.w}px ${r.h}px no-repeat`)].join(', ');
+  const bg = document.getElementById('bg');
+  bg.style.webkitMask = layers; bg.style.webkitMaskComposite = 'xor';
+  bg.style.mask = layers; bg.style.maskComposite = 'exclude';
+}
+
+/* ---------- 背景の山並み・霞 ---------- */
+function ridge(id, x0, x1, base, amp, seed, bottom) {
+  // 尖った峰が連なる稜線。端はなだらかに下げる
+  let d = `M${x0} ${bottom}`;
+  for (let x = x0; x <= x1; x += 8) {
+    const peak = .6 * Math.pow(Math.abs(Math.sin(x / 170 + seed)), 2.2)
+               + .4 * Math.pow(Math.abs(Math.sin(x / 83 + seed * 2)), 3);
+    const env = Math.min(1, (x - x0) / 260, (x1 - x) / 260);
+    const y = bottom - (bottom - (base - peak * amp)) * Math.max(0, env);
+    d += ` L${x} ${y.toFixed(1)}`;
+  }
+  d += ` L${x1} ${bottom} Z`;
+  document.getElementById(id).setAttribute('d', d);
+}
+ridge('ridge1', 1200, 2200, 300, 150, 1.1, 1080);
+ridge('ridge2', 1300, 2200, 520, 110, 2.3, 1080);
+ridge('ridge3', -20, 700, 760, 120, 3.7, 1080);
+const kumoSvg = n => {
+  const sets = {
+    1: [[0, 0, 170], [50, 22, 230], [14, 44, 130]],
+    2: [[40, 0, 150], [0, 22, 260], [70, 44, 160]],
+    3: [[0, 0, 220], [60, 22, 150], [20, 44, 260]]
+  }[n];
+  return `<svg width="300" height="62"><defs><linearGradient id="kg${n}" x1="0" x2="1"><stop offset="0" stop-color="#f1e6c8"/><stop offset=".6" stop-color="#d9bf86"/><stop offset="1" stop-color="#b8924c"/></linearGradient></defs>
+    <g fill="url(#kg${n})">${sets.map(([x, y, w]) => `<rect x="${x}" y="${y}" width="${w}" height="16" rx="8"/>`).join('')}</g></svg>`;
+};
+document.querySelectorAll('[data-kumo]').forEach(el => el.innerHTML = kumoSvg(el.dataset.kumo));
+
+/* ---------- 赤い筆（かすれた筆跡を一度だけ描く） ---------- */
+(function () {
+  const g = document.getElementById('brushes').getContext('2d');
+  let seed = 7;
+  const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  function stroke(x0, y0, x1, y1, w, col) {
+    const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy), nx = -dy / len, ny = dx / len;
+    g.lineCap = 'round';
+    for (let i = 0; i < 90; i++) {           // 毛先1本ずつ
+      const o = (rnd() - .5) * w, t0 = rnd() * .18, t1 = 1 - rnd() * .3;
+      const taper = 1 - Math.abs(o) / (w / 2) * .5;
+      g.strokeStyle = `rgba(${col},${(.18 + rnd() * .5) * taper})`;
+      g.lineWidth = 1 + rnd() * 4;
+      g.beginPath();
+      g.moveTo(x0 + dx * t0 + nx * o, y0 + dy * t0 + ny * o);
+      g.quadraticCurveTo(x0 + dx * .5 + nx * (o + (rnd() - .5) * 10), y0 + dy * .5 + ny * (o + (rnd() - .5) * 10),
+                         x0 + dx * t1 + nx * o * .7, y0 + dy * t1 + ny * o * .7);
+      g.stroke();
+    }
+    for (let i = 0; i < 26; i++) {           // 飛び散り
+      const t = .7 + rnd() * .4, o = (rnd() - .5) * w * 1.6;
+      g.fillStyle = `rgba(${col},${.3 + rnd() * .5})`;
+      g.beginPath(); g.arc(x0 + dx * t + nx * o, y0 + dy * t + ny * o, .8 + rnd() * 3, 0, 6.3); g.fill();
+    }
+  }
+  const R = '200,24,30', D = '140,14,18';
+  stroke(-60, 210, 470, -40, 70, R);
+  stroke(-40, 290, 330, 90, 26, D);
+  stroke(1360, 40, 1395, 860, 46, R);
+  stroke(1388, 120, 1400, 700, 16, D);
+  stroke(-40, 640, 380, 880, 60, R);
+  stroke(880, 875, 1380, 700, 44, R);
+  stroke(1900, 170, 1840, 400, 40, R);
+  stroke(1910, 520, 1860, 660, 24, D);
+})();
+
+/* ---------- 下帯 ---------- */
+const defaults = {
+  inTag: '決勝戦',
+  inSub: '第一試合',
+  inTitle: 'まもなく対局開始',
+  inTicker: 'ご視聴ありがとうございます　／　対局開始までしばらくお待ちください'
+};
+const outMap = { inTag: 'bandTag', inSub: 'bandSub', inTitle: 'bandTitle', inTicker: 'bandTicker' };
+function load(k, d) { try { return localStorage.getItem('wa_' + k) ?? d; } catch (e) { return d; } }
+function save(k, v) { try { localStorage.setItem('wa_' + k, v); } catch (e) {} }
+for (const id in outMap) {
+  const input = document.getElementById(id), out = document.getElementById(outMap[id]);
+  input.value = load(id, defaults[id]);
+  out.textContent = input.value;
+  input.oninput = () => { out.textContent = input.value; save(id, input.value); notify(); };
+}
+const band = document.getElementById('band'), bandBtn = document.getElementById('bandToggle');
+function setBand(show, persist = true) {
+  band.classList.toggle('hide', !show);
+  bandBtn.classList.toggle('active', show);
+  bandBtn.textContent = show ? '表示中' : '非表示';
+  if (persist) { save('band', show ? '1' : '0'); notify(); }
+}
+bandBtn.onclick = () => setBand(band.classList.contains('hide'));
+setBand(load('band', '1') === '1', false);
+
+/* ---------- 他のページ（OBSドックの操作パネル等）からの変更を反映 ---------- */
+function refresh() {
+  for (const id in outMap) {
+    const input = document.getElementById(id), v = load(id, defaults[id]);
+    if (document.activeElement !== input) input.value = v;
+    document.getElementById(outMap[id]).textContent = v;
+  }
+  setBand(load('band', '1') === '1', false);
+}
+let bc = null;
+try { bc = new BroadcastChannel('wa-overlay'); bc.onmessage = refresh; } catch (e) {}
+function notify() { if (bc) bc.postMessage('update'); }
+addEventListener('storage', e => { if (!e.key || e.key.startsWith('wa_')) refresh(); });
+
+/* ---------- 金の火の粉（ゆっくり上昇） ---------- */
+const cv = document.getElementById('embers');
+const ctx = cv.getContext('2d');
+const embers = Array.from({ length: 70 }, () => newEmber(true));
+function newEmber(init) {
+  const red = Math.random() < .25;
+  return {
+    x: Math.random() * 1920, y: init ? Math.random() * 1080 : 1090,
+    r: .8 + Math.random() * 2, vy: 8 + Math.random() * 18, sway: 10 + Math.random() * 30,
+    ph: Math.random() * 6.28, a: .25 + Math.random() * .55,
+    c: red ? '235,80,60' : '236,205,140'
+  };
+}
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const t = now / 1000;
+  ctx.clearRect(0, 0, 1920, 1080);
+  for (let i = 0; i < embers.length; i++) {
+    const p = embers[i];
+    p.y -= p.vy * dt;
+    if (p.y < -10) { embers[i] = newEmber(false); continue; }
+    const x = p.x + Math.sin(t * .5 + p.ph) * p.sway;
+    const a = p.a * (.6 + .4 * Math.sin(t * 1.3 + p.ph));
+    ctx.fillStyle = `rgba(${p.c},${a})`;
+    ctx.shadowColor = `rgba(${p.c},${a})`; ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.arc(x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+  }
+  requestAnimationFrame(frame);
+}
+if (LAYER !== 'front' && !PANEL) requestAnimationFrame(frame); // 前面レイヤーは描かない
+</script>
+</body>
+</html>
