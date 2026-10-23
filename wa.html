@@ -58,10 +58,10 @@
   #embers { position: absolute; inset: 0; }
 
   /* ===== 雀魂枠 ===== */
-  #game { position: absolute; left: 56px; top: 96px; width: 1264px; height: 711px; overflow: hidden; background: #000; }
-  #game iframe {   /* 雀魂は 1920x1080 で描画して 1264x711 に縮小 */
+  #game { position: absolute; left: 85px; top: 89px; width: 1337px; height: 752px; overflow: hidden; background: #000; }
+  #game iframe {   /* 雀魂は 1920x1080 で描画して 1337x752 に縮小（点数アプリの結果表・推移グラフの幅に合わせた） */
     width: 1920px; height: 1080px; border: 0; display: block;
-    transform: scale(0.658333); transform-origin: 0 0;
+    transform: scale(0.696354); transform-origin: 0 0;
   }
   body.hole #game { display: none; }
 
@@ -221,10 +221,10 @@ function fit() { if (PANEL) return; document.getElementById('root').style.transf
 addEventListener('resize', fit); fit();
 
 /* ---------- レイアウト ---------- */
-const GAME = { x: 56, y: 96, w: 1264, h: 711 };
+const GAME = { x: 85, y: 89, w: 1337, h: 752 };
 const CAM_RECTS = CAMS === 3
-  ? [{ x: 1462, y: 96, w: 400, h: 225 }, { x: 1462, y: 339, w: 400, h: 225 }, { x: 1462, y: 582, w: 400, h: 225 }]
-  : [{ x: 1462, y: 96, w: 400, h: 346 }, { x: 1462, y: 461, w: 400, h: 346 }];
+  ? [{ x: 1478, y: 89, w: 400, h: 225 }, { x: 1478, y: 353, w: 400, h: 225 }, { x: 1478, y: 616, w: 400, h: 225 }]
+  : [{ x: 1478, y: 89, w: 400, h: 367 }, { x: 1478, y: 474, w: 400, h: 367 }];
 
 // 枠を描く
 const frames = document.getElementById('frames');
@@ -309,8 +309,8 @@ document.querySelectorAll('[data-kumo]').forEach(el => el.innerHTML = kumoSvg(el
   const R = '200,24,30', D = '140,14,18';
   stroke(-60, 210, 470, -40, 70, R);
   stroke(-40, 290, 330, 90, 26, D);
-  stroke(1360, 40, 1395, 860, 46, R);
-  stroke(1388, 120, 1400, 700, 16, D);
+  stroke(1440, 40, 1456, 880, 34, R);
+  stroke(1452, 120, 1458, 700, 12, D);
   stroke(-40, 640, 380, 880, 60, R);
   stroke(880, 875, 1380, 700, 44, R);
   stroke(1900, 170, 1840, 400, 40, R);
