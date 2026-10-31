@@ -8,7 +8,8 @@
 <style>
   /*
     使い方（OBS ブラウザソース 1920x1080）
-    - vpl.html               … 右上の枠に雀魂を表示（雀魂は内部 1920x1080 で描画して縮小）
+    - vpl.html               … 右上の枠に雀魂を表示（枠のサイズで直接描画）
+    - vpl.html?render=1920   … 雀魂を 1920x1080 で描画して縮小する旧方式
     - vpl.html?game=0        … 雀魂枠を透明にする（下に雀魂のウィンドウキャプチャ等を置く）
     - vpl.html?url=...       … iframe に読み込むURLを変更
     - 操作ボタンは 1080px より下（ソース高さ 1140 + 下 60px クロップで「対話」から操作）
@@ -99,8 +100,11 @@
 
   /* ===== 雀魂枠 ===== */
   #game { position: absolute; left: 550px; top: 32px; width: 1312px; height: 738px; overflow: hidden; background: #000; border-radius: 14px; }
-  #game iframe {   /* 雀魂は 1920x1080 で描画して 1312x738 に縮小 */
-    width: 1920px; height: 1080px; border: 0; display: block;
+  #game iframe {   /* 雀魂は枠のサイズ(1312x738)で直接描画（縮小しないのでくっきり） */
+    width: 100%; height: 100%; border: 0; display: block;
+  }
+  body.render1920 #game iframe {   /* ?render=1920 のとき：1920x1080 で描画して縮小（旧方式） */
+    width: 1920px; height: 1080px;
     transform: scale(0.683333); transform-origin: 0 0;
   }
   body.hole #game { display: none; }
@@ -269,6 +273,7 @@ const LAYER = params.get('layer');   // 'front' | 'back' | null
 const PANEL = params.get('panel') === '1';
 if (PANEL) document.body.classList.add('panel');
 if (params.get('game') === '0') document.body.classList.add('hole');
+if (params.get('render') === '1920') document.body.classList.add('render1920');
 if (LAYER) document.body.classList.add('layer-' + LAYER);
 if (params.get('game') !== '0' && LAYER !== 'back' && !PANEL) document.getElementById('gameFrame').src = GAME_URL;
 
