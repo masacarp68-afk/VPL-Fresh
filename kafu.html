@@ -124,10 +124,9 @@
   .rule.show { opacity: 1; transform: none; }
   .rule .washi { opacity: .3; }
   .rule .pill { position: relative; height: 66px; padding: 0 60px 0 66px; font-size: 40px; letter-spacing: 12px; }
-  .rule ul { position: relative; list-style: none; margin: 46px 0 0; padding: 0; color: var(--ink); font-weight: 800; font-size: 38px; line-height: 54px; }
-  .rule li { display: flex; gap: 20px; margin-bottom: 16px; }
+  .rule ul { position: relative; list-style: none; margin: 40px 0 0; padding: 0; max-width: 1360px; color: var(--ink); font-weight: 800; font-size: 38px; line-height: 54px; }
+  .rule li { display: flex; gap: 20px; margin-bottom: 14px; }
   .rule li svg { flex: none; margin-top: 10px; }
-  .rule.r2 ul { font-size: 37px; line-height: 52px; }
 
   /* ===== 下帯（点数表示を出さない時用） ===== */
   #band {
@@ -257,25 +256,16 @@
 
   <!-- ルール -->
   <div id="rule1" class="rule r1 deco"><div class="washi"></div>
-    <div class="pill">ルール</div><ul>
-      <li data-b>順位点 1位+50p 2位+10p 3位▲10p 4位▲30p</li>
-      <li data-b>赤牌が3枚 一発・裏ドラ・カンドラ・カン裏あり</li>
-      <li data-b>ダブロンなし（アタマハネ）トビなし</li>
-      <li data-b>途中流局なし</li>
-      <li data-b>切り上げ満貫</li>
-      <li data-b>数え役満なし、ダブル役満なし（純粋な複合時あり）</li>
-      <li data-b>同点は起家に近い方が上位（雀魂仕様）</li>
-      <li data-b>終了時供託リーチ棒トップ取り（雀魂仕様）</li>
-    </ul>
-  </div>
-  <div id="rule2" class="rule r2 deco"><div class="washi"></div>
-    <div class="pill">システム</div><ul>
-      <li data-b>A・Bリーグは48名／Cリーグは27名で開催。</li>
-      <li data-b>5節終了時、4位以上が決定戦に進出。</li>
-      <li data-b>決定戦は5節までのポイントを半分持ち越し。</li>
-      <li data-b>Aリーグ…下位15名がBリーグへ降級。</li>
-      <li data-b>Bリーグ…上位15名がAリーグへ昇級。下位16名がCリーグに降級。</li>
-      <li data-b>Cリーグ…優勝者がAリーグへ特別昇級。15名がBリーグへ昇級。</li>
+    <div class="pill">システム・ルール</div><ul>
+      <li data-b>1チーム5人。協会Aチーム×協会Bチーム×<br>VPLチーム×雀魂チームのチーム戦。</li>
+      <li data-b>全5回戦。各回戦4卓の同時進行。</li>
+      <li data-b>各回戦のチームのスコアを全て加算する。</li>
+      <li data-b>5回戦終了時、スコアの多いチームが勝利。</li>
+      <li data-b>半荘戦。</li>
+      <li data-b>25000点持ち30000点返し、ウマ10-30。</li>
+      <li data-b>喰いタン、裏ドラ、槓ドラ、槓裏、一発あり。</li>
+      <li data-b>赤ドラ、途中流局、ダブロン、トビ終了、アガリやめ、<br>テンパイやめなし。</li>
+      <li data-b>その他は雀魂大会モードの麻雀協会公認ルールに則る。</li>
     </ul>
   </div>
 
@@ -305,7 +295,7 @@
   <input id="inName3" size="8" placeholder="演者3">
   <input id="inName4" size="8" placeholder="演者4"></div>
   <div class="sep"></div>
-  <div class="grp">ルール：<button data-rule="1">ルール1</button><button data-rule="2">ルール2</button><button data-rule="0" class="active">消</button></div>
+  <div class="grp">ルール：<button data-rule="1">表示</button><button data-rule="0" class="active">消</button></div>
 </div>
 </div>
 
