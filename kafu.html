@@ -110,7 +110,6 @@
     transition: opacity .3s;
   }
   .name.empty { opacity: 0; }
-  .gHide { display: none; }
 
   /* ===== ルール ===== */
   .rule {
@@ -303,9 +302,6 @@
   <input id="inName3" size="8" placeholder="演者3">
   <input id="inName4" size="8" placeholder="演者4"></div>
   <div class="sep"></div>
-  <div class="grp">ゲスト：<button id="guestToggle">なし</button><button data-gpos="tl">左上</button><button data-gpos="tr">右上</button><button data-gpos="bl">左下</button><button data-gpos="br">右下</button>
-  <input id="inName5" size="8" placeholder="ゲスト名"></div>
-  <div class="sep"></div>
   <div class="grp">表示：<button data-rule="1">ルール</button><button data-rule="2">ファンミ</button><button data-rule="3">4節</button><button data-rule="4">選手</button><button data-rule="0" class="active">消</button></div>
 </div>
 </div>
@@ -344,7 +340,6 @@ function addFrame(r, pad, small, id) {
   Object.assign(f.style, { left: r.x - pad + 'px', top: r.y - pad + 'px', width: r.w + pad * 2 + 'px', height: r.h + pad * 2 + 'px' });
   f.innerHTML = ['tl', 'tr', 'bl', 'br'].map(c => `<svg class="corner ${c}"><use href="#sakura"/></svg>`).join('');
   frames.appendChild(f);
-  return f;
 }
 addFrame(GAME, 8, false);
 CAM_RECTS.forEach(r => addFrame(r, 6, true));
@@ -358,36 +353,6 @@ const nameEls = CAM_RECTS.map(r => {
   frames.appendChild(n);
   return n;
 });
-
-// ゲスト小窓（雀魂枠の隅。雀魂・ルール画像に穴を開けて、下に置いたカメラを見せる）
-const GUEST_W = 352, GUEST_H = 198, GUEST_M = 18;
-function guestRect(pos) {
-  return {
-    x: pos[1] === 'l' ? GAME.x + GUEST_M : GAME.x + GAME.w - GUEST_M - GUEST_W,
-    y: pos[0] === 't' ? GAME.y + GUEST_M : GAME.y + GAME.h - GUEST_M - GUEST_H,
-    w: GUEST_W, h: GUEST_H
-  };
-}
-const guestFrame = addFrame({ x: 0, y: 0, w: GUEST_W, h: GUEST_H }, 6, true);
-const guestName = document.createElement('div');
-guestName.className = 'pill name';
-frames.appendChild(guestName);
-nameEls.push(guestName);
-function setGuest(on, pos, persist = true) {
-  const r = guestRect(pos);
-  Object.assign(guestFrame.style, { left: r.x - 6 + 'px', top: r.y - 6 + 'px' });
-  Object.assign(guestName.style, { left: r.x + 14 + 'px', top: r.y + r.h - 22 + 'px' });
-  guestFrame.classList.toggle('gHide', !on); guestName.classList.toggle('gHide', !on);
-  const m = on ? `linear-gradient(#000,#000), linear-gradient(#000,#000) ${r.x - GAME.x}px ${r.y - GAME.y}px / ${r.w}px ${r.h}px no-repeat` : 'none';
-  [document.getElementById('game'), ...document.querySelectorAll('.rule')].forEach(el => {
-    el.style.webkitMask = m; el.style.webkitMaskComposite = 'xor';
-    el.style.mask = m; el.style.maskComposite = 'exclude';
-  });
-  const btn = document.getElementById('guestToggle');
-  btn.classList.toggle('active', on); btn.textContent = on ? 'あり' : 'なし';
-  document.querySelectorAll('#controls button[data-gpos]').forEach(b => b.classList.toggle('active', b.dataset.gpos === pos));
-  if (persist) { save('guest', on ? '1' : '0'); save('gpos', pos); notify(); }
-}
 
 // 背景の穴（カメラ枠は常に／雀魂枠は game=0 の時）。背景レイヤー単体では穴を開けない
 if (LAYER !== 'back') {
@@ -486,7 +451,7 @@ const defaults = {
   inSub: '雀魂 × 日本プロ麻雀協会',
   inTitle: 'まもなく開始',
   inTicker: '華風戦 VPL応援同時視聴　／　ご視聴ありがとうございます！　／　コメントで一緒に応援しよう！',
-  inName1: '演者1', inName2: '演者2', inName3: '演者3', inName4: '演者4', inName5: 'ゲスト'
+  inName1: '演者1', inName2: '演者2', inName3: '演者3', inName4: '演者4'
 };
 const outMap = { inTag: 'bandTag', inSub: 'bandSub', inTitle: 'bandTitle', inTicker: 'bandTicker' };
 function load(k, d) { try { return localStorage.getItem('kafu_' + k) ?? d; } catch (e) { return d; } }
@@ -521,11 +486,6 @@ function setRule(r, persist = true) {
 document.querySelectorAll('#controls button[data-rule]').forEach(b => b.onclick = () => setRule(b.dataset.rule));
 setRule(load('rule', '0'), false);
 
-/* ---------- ゲスト小窓 ---------- */
-document.getElementById('guestToggle').onclick = () => setGuest(load('guest', '0') !== '1', load('gpos', 'tr'));
-document.querySelectorAll('#controls button[data-gpos]').forEach(b => b.onclick = () => setGuest(load('guest', '0') === '1', b.dataset.gpos));
-setGuest(load('guest', '0') === '1', load('gpos', 'tr'), false);
-
 /* ---------- 他のページ（OBSドックの操作パネル等）からの変更を反映 ---------- */
 function refresh() {
   for (const id in defaults) {
@@ -535,7 +495,6 @@ function refresh() {
   }
   setBand(load('band', '1') === '1', false);
   setRule(load('rule', '0'), false);
-  setGuest(load('guest', '0') === '1', load('gpos', 'tr'), false);
 }
 let bc = null;
 try { bc = new BroadcastChannel('kafu-overlay'); bc.onmessage = refresh; } catch (e) {}
