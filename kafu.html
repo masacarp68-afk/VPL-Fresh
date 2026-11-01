@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>華風戦 Overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Yuji+Boku&display=swap" rel="stylesheet">
+<style>
+  /*
+    使い方（OBS ブラウザソース 1920x1080）
+    - kafu.html                … 左の大枠に雀魂（枠のサイズで直接描画）／右に演者カメラ枠4つ
+    - kafu.html?game=0         … 雀魂枠を透明にする（下に雀魂のウィンドウキャプチャ等を置く）
+    - kafu.html?url=...        … iframe に読み込むURLを変更
+    - 操作ボタンは 1080px より下（ソース高さ 1140 + 下 60px クロップで「対話」から操作）
+    2枚重ね（カメラの後ろにも背景を出す）
+    - kafu.html?layer=front    … 背景なし（枠・雀魂・名前・下帯）→ カメラより上
+    - kafu.html?layer=back     … 動く背景だけ → カメラより下（一番下）
+    文字入力（日本語OK）
+    - kafu.html?panel=1        … 操作パネルだけ。OBS「ドック」→「カスタムブラウザドック」に追加
+  */
+  :root {
+    --cream: #fbf6ee;
+    --gold: #c9a24e;
+    --gold-l: #f3dc9c;
+    --gold-d: #9c7630;
+    --pink: #f08aa6;
+    --lav: #b4a6ea;
+    --sky: #9cc4f0;
+    --wine: #6e2240;
+    --ink: #1c1418;
+  }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+  #root { position: absolute; left: 0; top: 0; width: 1920px; height: 1140px; transform-origin: 0 0; }
+  #stage {
+    position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden;
+    font-family: "Shippori Mincho B1", serif;
+  }
+  #stage * { box-sizing: border-box; }
+  .deco, .deco * { pointer-events: none; }
+
+  /* ===== 背景 ===== */
+  #bg {
+    position: absolute; inset: 0; overflow: hidden;
+    background:
+      radial-gradient(ellipse 900px 600px at 8% 92%, rgba(240,138,166,.22), transparent 70%),
+      radial-gradient(ellipse 800px 560px at 96% 6%, rgba(180,166,234,.25), transparent 70%),
+      radial-gradient(ellipse 700px 500px at 100% 100%, rgba(156,196,240,.22), transparent 70%),
+      radial-gradient(ellipse 600px 420px at 0% 0%, rgba(243,220,156,.28), transparent 70%),
+      var(--cream);
+  }
+  #bg svg.scene { position: absolute; inset: 0; }
+  .washi {   /* 和紙のザラつき */
+    position: absolute; inset: 0; opacity: .22; mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 .78 0 0 0 0 .7 0 0 0 0 .62 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .ring { animation: spin 160s linear infinite; transform-origin: 760px 470px; }
+  .ring.rev { animation-duration: 220s; animation-direction: reverse; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .goldband { animation: slide 30s ease-in-out infinite alternate; }
+  .goldband.b { animation-duration: 38s; animation-direction: alternate-reverse; }
+  @keyframes slide { to { transform: translateX(60px); } }
+  .cloud { position: absolute; animation: cloud 28s ease-in-out infinite alternate; }
+  .cloud.b { animation-duration: 36s; animation-direction: alternate-reverse; }
+  @keyframes cloud { to { transform: translateX(50px); } }
+  .flower { position: absolute; animation: sway 9s ease-in-out infinite; }
+  .flower.b { animation-duration: 12s; animation-delay: -4s; }
+  @keyframes sway { 50% { transform: rotate(6deg) scale(1.04); } }
+  #petals { position: absolute; inset: 0; }
+
+  /* ===== 雀魂枠 ===== */
+  #game { position: absolute; left: 50px; top: 62px; width: 1424px; height: 801px; overflow: hidden; background: #000; }
+  #game iframe { width: 100%; height: 100%; border: 0; display: block; }   /* 枠のサイズで直接描画（くっきり） */
+  body.hole #game { display: none; }
+
+  /* ===== 枠：金の二重線＋パステルの外線＋角の花 ===== */
+  .kframe {
+    position: absolute; border: 5px solid; border-radius: 4px;
+    border-image: linear-gradient(135deg, #f6e2a6, #c19a45 22%, #fff4d2 45%, #b48a38 68%, #f3d790) 1;
+    filter: drop-shadow(0 4px 10px rgba(110,34,64,.22));
+  }
+  .kframe::before {   /* 内側の白線 */
+    content: ""; position: absolute; inset: -1px; border: 3px solid #fffaf2;
+  }
+  .kframe::after {   /* 外側のパステル線 */
+    content: ""; position: absolute; inset: -12px; border: 3px solid;
+    border-image: linear-gradient(90deg, var(--pink), var(--lav) 50%, var(--sky)) 1; opacity: .85;
+  }
+  .kframe svg.corner { position: absolute; width: 46px; height: 46px; }
+  .kframe svg.corner.tl { left: -29px; top: -29px; }
+  .kframe svg.corner.tr { right: -29px; top: -29px; }
+  .kframe svg.corner.bl { left: -29px; bottom: -29px; }
+  .kframe svg.corner.br { right: -29px; bottom: -29px; }
+  .kframe.small svg.corner { width: 34px; height: 34px; }
+  .kframe.small svg.corner.tl { left: -22px; top: -22px; } .kframe.small svg.corner.tr { right: -22px; top: -22px; }
+  .kframe.small svg.corner.bl { left: -22px; bottom: -22px; } .kframe.small svg.corner.br { right: -22px; bottom: -22px; }
+
+  /* 黒×金のピル（チーム対抗戦のプレート風） */
+  .pill {
+    display: inline-flex; align-items: center; justify-content: center; white-space: nowrap;
+    background: linear-gradient(180deg, #2b2226, #0e0a0c); color: #fff6dd;
+    border: 2px solid var(--gold); border-radius: 999px;
+    box-shadow: 0 0 0 2px #fffaf2, 0 0 0 3.5px var(--gold-d), 0 3px 8px rgba(0,0,0,.3);
+    font-weight: 800; letter-spacing: 4px;
+  }
+
+  /* ===== タイトル（右上） ===== */
+  #title { position: absolute; left: 1492px; top: 14px; width: 412px; height: 170px; text-align: center; }
+  #title .pill { height: 36px; padding: 0 30px 0 34px; font-size: 21px; margin-top: 4px; }
+  #title .main {
+    margin-top: 2px; font-family: "Yuji Boku", serif; font-size: 82px; line-height: 1.02; letter-spacing: 6px;
+    background: linear-gradient(180deg, #fff5cf 0%, #f2cf6e 38%, #c7922f 55%, #f6dc8e 78%, #b5822a 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 1.5px #7a2a3c;
+    filter: drop-shadow(0 0 1px #fff) drop-shadow(2px 3px 0 #6e2240) drop-shadow(0 0 10px rgba(240,138,166,.65));
+  }
+  #title .sub {
+    margin-top: 2px; font-size: 31px; font-weight: 800; letter-spacing: 3px; white-space: nowrap;
+    background: linear-gradient(180deg, #9a3a5c, #5a1a36); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 6px #fff);
+  }
+  #title .sub b { font-size: 38px; letter-spacing: 1px; margin-right: 4px; }
+
+  /* ===== 演者の名前 ===== */
+  .name {
+    position: absolute; height: 34px; padding: 0 20px 0 24px; font-size: 20px; letter-spacing: 3px;
+    transition: opacity .3s;
+  }
+  .name.empty { opacity: 0; }
+
+  /* ===== ルール ===== */
+  .rule {
+    position: absolute; left: 50px; top: 62px; width: 1424px; height: 801px;
+    opacity: 0; transform: scale(.96); transition: opacity .5s ease, transform .5s ease;
+    background:
+      radial-gradient(ellipse at 0% 100%, rgba(240,138,166,.25), transparent 55%),
+      radial-gradient(ellipse at 100% 0%, rgba(180,166,234,.28), transparent 55%),
+      var(--cream);
+    display: flex; flex-direction: column; align-items: center; padding-top: 70px;
+  }
+  .rule.show { opacity: 1; transform: none; }
+  .rule .washi { opacity: .3; }
+  .rule .pill { position: relative; height: 66px; padding: 0 60px 0 66px; font-size: 40px; letter-spacing: 12px; }
+  .rule ul { position: relative; list-style: none; margin: 46px 0 0; padding: 0; color: var(--ink); font-weight: 800; font-size: 38px; line-height: 54px; }
+  .rule li { display: flex; gap: 20px; margin-bottom: 16px; }
+  .rule li svg { flex: none; margin-top: 10px; }
+  .rule.r2 ul { font-size: 37px; line-height: 52px; }
+
+  /* ===== 下帯（点数表示を出さない時用） ===== */
+  #band {
+    position: absolute; left: 50px; top: 893px; width: 1424px; height: 165px; overflow: hidden;
+    background: linear-gradient(180deg, rgba(255,252,246,.95), rgba(250,242,232,.95));
+    transition: opacity .5s ease, transform .5s ease;
+  }
+  #band.hide { opacity: 0; transform: translateY(30px); }
+  #bandFrame { transition: opacity .5s ease; }
+  #bandFrame.hide { opacity: 0; }
+  #band .main { position: relative; height: 113px; display: flex; align-items: center; gap: 30px; padding: 0 40px; }
+  #band .pill { height: 54px; padding: 0 30px 0 34px; font-size: 28px; }
+  #band .sub { font-size: 30px; font-weight: 800; color: var(--wine); letter-spacing: 3px; white-space: nowrap; }
+  #band .title {
+    font-family: "Yuji Boku", serif; font-size: 64px; letter-spacing: 6px; white-space: nowrap;
+    background: linear-gradient(180deg, #fff5cf 0%, #f2cf6e 38%, #c7922f 55%, #f6dc8e 78%, #b5822a 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 1.2px #7a2a3c;
+    filter: drop-shadow(2px 2px 0 #6e2240) drop-shadow(0 0 8px rgba(240,138,166,.5));
+  }
+  #band .ticker {
+    position: relative; height: 52px; overflow: hidden; white-space: nowrap;
+    background: linear-gradient(90deg, rgba(240,138,166,.28), rgba(180,166,234,.28) 50%, rgba(156,196,240,.28));
+    border-top: 2px solid var(--gold-l);
+  }
+  #band .ticker span {
+    position: absolute; top: 0; line-height: 50px; left: 100%;
+    font-size: 25px; font-weight: 800; color: var(--wine); letter-spacing: 3px;
+    animation: ticker 34s linear infinite;
+  }
+  @keyframes ticker { to { transform: translateX(calc(-100% - 1424px)); } }
+
+  /* ===== 操作パネル（1080px より下 = 配信には映らない） ===== */
+  #controls {
+    position: absolute; left: 0; top: 1080px; width: 1920px; height: 60px;
+    background: #222; display: flex; align-items: center; gap: 7px; padding: 0 14px;
+    box-sizing: border-box; font: 700 16px sans-serif; color: #ccc; white-space: nowrap;
+  }
+  #controls button { font: 700 16px sans-serif; color: #fff; background: #555; border: 0; padding: 8px 12px; cursor: pointer; }
+  #controls button.active { background: #c0507a; outline: 2px solid #fff; }
+  #controls input { font: 14px sans-serif; padding: 6px 7px; border: 0; background: #444; color: #fff; }
+  #controls .sep { width: 2px; height: 34px; background: #555; margin: 0 6px; flex: none; }
+  #controls .grp { display: contents; }
+
+  /* 操作パネル単体モード（OBSカスタムドック用） */
+  body.panel { background: #1b1b1b; overflow: auto; }
+  body.panel #stage { display: none; }
+  body.panel #root { position: static; width: auto; height: auto; transform: none !important; }
+  body.panel #controls { position: static; width: auto; height: auto; padding: 14px; flex-direction: column; align-items: stretch; gap: 8px; white-space: normal; }
+  body.panel #controls .grp { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  body.panel #controls input { width: 100%; font-size: 16px; }
+  body.panel #controls .sep { width: auto; height: 1px; margin: 6px 0; }
+
+  /* ===== 2枚重ねモード ===== */
+  body.layer-front #bg { display: none; }
+  body.layer-back #stage > :not(#bg), body.layer-back #controls { display: none; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <filter id="brushy"><feTurbulence type="fractalNoise" baseFrequency=".012 .05" numOctaves="3" seed="3"/><feDisplacementMap in="SourceGraphic" scale="40"/></filter>
+    <filter id="leaf"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="9" result="n"/><feColorMatrix in="n" values="0 0 0 0 1  0 0 0 0 .95  0 0 0 0 .8  0 0 0 .45 0" result="s"/><feComposite in="s" in2="SourceGraphic" operator="in" result="sp"/><feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="sp"/></feMerge></filter>
+    <linearGradient id="goldG" x1="0" x2="1"><stop offset="0" stop-color="#f3dc9c" stop-opacity="0"/><stop offset=".15" stop-color="#e9c977"/><stop offset=".5" stop-color="#d4ab55"/><stop offset=".85" stop-color="#ecd18a"/><stop offset="1" stop-color="#f3dc9c" stop-opacity="0"/></linearGradient>
+    <radialGradient id="cornerG"><stop offset="0" stop-color="#fff3cf"/><stop offset="1" stop-color="#c9a24e"/></radialGradient>
+    <symbol id="sakura" viewBox="-50 -50 100 100">
+      <g id="sakuraPetals"></g>
+      <circle r="9" fill="#f6d37a" stroke="#b48a38" stroke-width="2"/>
+    </symbol>
+  </defs>
+</svg>
+<div id="root">
+<div id="stage">
+  <!-- 背景（layer=back はここだけ） -->
+  <div id="bg" class="deco">
+    <svg class="scene" width="1920" height="1080" viewBox="0 0 1920 1080">
+      <defs>
+        <pattern id="seigaiha" width="80" height="40" patternUnits="userSpaceOnUse"><g id="sgTile"></g></pattern>
+        <radialGradient id="fadeA"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+        <mask id="mA"><ellipse cx="160" cy="1020" rx="620" ry="300" fill="url(#fadeA)"/></mask>
+        <mask id="mB"><ellipse cx="1800" cy="60" rx="420" ry="240" fill="url(#fadeA)"/></mask>
+        <mask id="mC"><ellipse cx="1700" cy="1080" rx="520" ry="260" fill="url(#fadeA)"/></mask>
+        <linearGradient id="ringG" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#f08aa6"/><stop offset=".5" stop-color="#f6c7d3"/><stop offset="1" stop-color="#b4a6ea"/></linearGradient>
+      </defs>
+      <!-- 青海波 -->
+      <rect width="1920" height="1080" fill="url(#seigaiha)" mask="url(#mA)" opacity=".75"/>
+      <rect width="1920" height="1080" fill="url(#seigaiha)" mask="url(#mB)" opacity=".7"/>
+      <rect width="1920" height="1080" fill="url(#seigaiha)" mask="url(#mC)" opacity=".6"/>
+      <!-- 大きな筆の輪 -->
+      <g class="ring"><circle cx="760" cy="470" r="700" fill="none" stroke="url(#ringG)" stroke-width="46" opacity=".35" filter="url(#brushy)"/></g>
+      <g class="ring rev"><circle cx="760" cy="470" r="760" fill="none" stroke="#e2bf6e" stroke-width="10" stroke-dasharray="900 260 400 300" opacity=".45" filter="url(#brushy)"/></g>
+      <!-- 金箔の霞 -->
+      <g class="goldband" filter="url(#leaf)">
+        <rect x="-80" y="10" width="560" height="22" rx="11" fill="url(#goldG)"/>
+        <rect x="120" y="36" width="380" height="12" rx="6" fill="url(#goldG)" opacity=".8"/>
+        <rect x="-60" y="1040" width="700" height="24" rx="12" fill="url(#goldG)"/>
+        <rect x="1500" y="1066" width="460" height="14" rx="7" fill="url(#goldG)" opacity=".9"/>
+      </g>
+      <g class="goldband b" filter="url(#leaf)">
+        <rect x="980" y="6" width="520" height="18" rx="9" fill="url(#goldG)"/>
+        <rect x="1180" y="30" width="300" height="12" rx="6" fill="url(#goldG)" opacity=".8"/>
+        <rect x="-120" y="560" width="200" height="16" rx="8" fill="url(#goldG)"/>
+        <rect x="-120" y="590" width="150" height="10" rx="5" fill="url(#goldG)" opacity=".8"/>
+        <rect x="560" y="1062" width="620" height="14" rx="7" fill="url(#goldG)" opacity=".9"/>
+      </g>
+    </svg>
+    <!-- 瑞雲 -->
+    <div class="cloud" data-cloud="1" style="left:560px; top:-6px;"></div>
+    <div class="cloud b" data-cloud="2" style="left:-40px; top:300px;"></div>
+    <div class="cloud" data-cloud="2" style="left:1380px; top:1010px;"></div>
+    <div class="cloud b" data-cloud="1" style="left:880px; top:1000px;"></div>
+    <!-- 牡丹 -->
+    <canvas class="flower" data-flower="pink" data-r="150" style="left:-130px; top:-140px;"></canvas>
+    <canvas class="flower b" data-flower="lav" data-r="95" style="left:1390px; top:-110px;"></canvas>
+    <canvas class="flower" data-flower="pink" data-r="120" style="left:1800px; top:-90px;"></canvas>
+    <canvas class="flower b" data-flower="sky" data-r="85" style="left:-100px; top:660px;"></canvas>
+    <canvas class="flower" data-flower="peach" data-r="160" style="left:-150px; top:880px;"></canvas>
+    <canvas class="flower b" data-flower="lav" data-r="110" style="left:300px; top:990px;"></canvas>
+    <canvas class="flower" data-flower="pink" data-r="80" style="left:1420px; top:960px;"></canvas>
+    <canvas class="flower b" data-flower="sky" data-r="70" style="left:1820px; top:960px;"></canvas>
+    <div class="washi"></div>
+    <canvas id="petals" width="1920" height="1080"></canvas>
+  </div>
+
+  <!-- 雀魂 -->
+  <div id="game"><iframe id="gameFrame" allow="autoplay; fullscreen; clipboard-read; clipboard-write" allowfullscreen></iframe></div>
+
+  <!-- ルール -->
+  <div id="rule1" class="rule r1 deco"><div class="washi"></div>
+    <div class="pill">ルール</div><ul>
+      <li data-b>順位点 1位+50p 2位+10p 3位▲10p 4位▲30p</li>
+      <li data-b>赤牌が3枚 一発・裏ドラ・カンドラ・カン裏あり</li>
+      <li data-b>ダブロンなし（アタマハネ）トビなし</li>
+      <li data-b>途中流局なし</li>
+      <li data-b>切り上げ満貫</li>
+      <li data-b>数え役満なし、ダブル役満なし（純粋な複合時あり）</li>
+      <li data-b>同点は起家に近い方が上位（雀魂仕様）</li>
+      <li data-b>終了時供託リーチ棒トップ取り（雀魂仕様）</li>
+    </ul>
+  </div>
+  <div id="rule2" class="rule r2 deco"><div class="washi"></div>
+    <div class="pill">システム</div><ul>
+      <li data-b>A・Bリーグは48名／Cリーグは27名で開催。</li>
+      <li data-b>5節終了時、4位以上が決定戦に進出。</li>
+      <li data-b>決定戦は5節までのポイントを半分持ち越し。</li>
+      <li data-b>Aリーグ…下位15名がBリーグへ降級。</li>
+      <li data-b>Bリーグ…上位15名がAリーグへ昇級。下位16名がCリーグに降級。</li>
+      <li data-b>Cリーグ…優勝者がAリーグへ特別昇級。15名がBリーグへ昇級。</li>
+    </ul>
+  </div>
+
+  <!-- 枠・名前（JSで配置） -->
+  <div id="frames" class="deco"></div>
+
+  <!-- タイトル -->
+  <div id="title" class="deco">
+    <div class="pill">チーム対抗戦</div>
+    <div class="main">華風戦</div>
+    <div class="sub"><b>VPL</b>応援同時視聴</div>
+  </div>
+
+  <!-- 下帯 -->
+  <div id="band" class="deco">
+    <div class="main">
+      <div class="pill" id="bandTag"></div>
+      <div class="sub" id="bandSub"></div>
+      <div class="title" id="bandTitle"></div>
+    </div>
+    <div class="ticker"><span id="bandTicker"></span></div>
+  </div>
+</div>
+<div id="controls">
+  <div class="grp">下帯：<button id="bandToggle" class="active">表示中</button>
+  <input id="inTag" size="8" placeholder="札">
+  <input id="inSub" size="12" placeholder="小見出し">
+  <input id="inTitle" size="14" placeholder="メイン">
+  <input id="inTicker" size="30" placeholder="流れる文字"></div>
+  <div class="sep"></div>
+  <div class="grp">名前：
+  <input id="inName1" size="8" placeholder="演者1">
+  <input id="inName2" size="8" placeholder="演者2">
+  <input id="inName3" size="8" placeholder="演者3">
+  <input id="inName4" size="8" placeholder="演者4"></div>
+  <div class="sep"></div>
+  <div class="grp">ルール：<button data-rule="1">ルール1</button><button data-rule="2">ルール2</button><button data-rule="0" class="active">消</button></div>
+</div>
+</div>
+
+<script>
+/* ---------- 設定 ---------- */
+const params = new URLSearchParams(location.search);
+const GAME_URL = params.get('url') || 'https://game.mahjongsoul.com/';
+const LAYER = params.get('layer');   // 'front' | 'back' | null
+const PANEL = params.get('panel') === '1';
+const HOLE = params.get('game') === '0';
+if (PANEL) document.body.classList.add('panel');
+if (HOLE) document.body.classList.add('hole');
+if (LAYER) document.body.classList.add('layer-' + LAYER);
+if (!HOLE && LAYER !== 'back' && !PANEL) document.getElementById('gameFrame').src = GAME_URL;
+
+/* ---------- 画面フィット（横幅基準） ---------- */
+function fit() { if (PANEL) return; document.getElementById('root').style.transform = `scale(${innerWidth / 1920})`; }
+addEventListener('resize', fit); fit();
+
+/* ---------- レイアウト ---------- */
+const GAME = { x: 50, y: 62, w: 1424, h: 801 };
+const CAM_RECTS = [196, 416, 636, 856].map(y => ({ x: 1508, y, w: 384, h: 200 }));
+const BAND = { x: 50, y: 893, w: 1424, h: 165 };
+
+// 桜の花びら（角飾り用シンボル）
+document.getElementById('sakuraPetals').innerHTML = [0, 72, 144, 216, 288].map(a =>
+  `<path transform="rotate(${a})" d="M0 -6 C14 -14 22 -34 12 -46 L4 -40 L0 -48 L-4 -40 L-12 -46 C-22 -34 -14 -14 0 -6Z" fill="#fde3ea" stroke="#c9a24e" stroke-width="3"/>`).join('');
+
+// 枠を描く
+const frames = document.getElementById('frames');
+function addFrame(r, pad, small, id) {
+  const f = document.createElement('div');
+  f.className = 'kframe' + (small ? ' small' : '');
+  if (id) f.id = id;
+  Object.assign(f.style, { left: r.x - pad + 'px', top: r.y - pad + 'px', width: r.w + pad * 2 + 'px', height: r.h + pad * 2 + 'px' });
+  f.innerHTML = ['tl', 'tr', 'bl', 'br'].map(c => `<svg class="corner ${c}"><use href="#sakura"/></svg>`).join('');
+  frames.appendChild(f);
+}
+addFrame(GAME, 8, false);
+CAM_RECTS.forEach(r => addFrame(r, 6, true));
+addFrame(BAND, 6, true, 'bandFrame');
+
+// 演者の名前プレート（カメラ枠の左下）
+const nameEls = CAM_RECTS.map(r => {
+  const n = document.createElement('div');
+  n.className = 'pill name';
+  Object.assign(n.style, { left: r.x + 14 + 'px', top: r.y + r.h - 22 + 'px' });
+  frames.appendChild(n);
+  return n;
+});
+
+// 背景の穴（カメラ枠は常に／雀魂枠は game=0 の時）。背景レイヤー単体では穴を開けない
+if (LAYER !== 'back') {
+  const holes = [...CAM_RECTS, ...(HOLE ? [GAME] : [])];
+  const layers = ['linear-gradient(#000,#000)', ...holes.map(r => `linear-gradient(#000,#000) ${r.x}px ${r.y}px / ${r.w}px ${r.h}px no-repeat`)].join(', ');
+  const bg = document.getElementById('bg');
+  bg.style.webkitMask = layers; bg.style.webkitMaskComposite = 'xor';
+  bg.style.mask = layers; bg.style.maskComposite = 'exclude';
+}
+
+// ルールの箇条書きマーク（桜）
+document.querySelectorAll('.rule li[data-b]').forEach((li, i) => {
+  li.innerHTML = `<svg width="34" height="34"><use href="#sakura"/></svg><span>${li.innerHTML}</span>`;
+});
+
+/* ---------- 背景パーツ ---------- */
+if (LAYER !== 'front' && !PANEL) {
+  // 青海波
+  const C = [[40, 0], [0, 20], [80, 20], [40, 40]];
+  document.getElementById('sgTile').innerHTML = C.map(([x, y]) =>
+    [38, 30, 22, 14, 6].map(r => `<circle cx="${x}" cy="${y}" r="${r}" fill="${r === 38 ? '#fbf6ee' : 'none'}" stroke="#d9bd7c" stroke-width="2"/>`).join('')).join('');
+
+  // 瑞雲（丸を重ねて外周だけ線を残す）
+  const cloudSvg = n => {
+    const sets = {
+      1: { w: 360, h: 90, c: [[40, 60, 30], [90, 46, 40], [150, 40, 46], [210, 48, 38], [262, 58, 30], [310, 64, 22]] },
+      2: { w: 280, h: 90, c: [[36, 62, 26], [80, 48, 36], [134, 44, 40], [186, 52, 32], [230, 62, 24]] }
+    }[n];
+    const base = `<rect x="${sets.c[0][0]}" y="62" width="${sets.c[sets.c.length - 1][0] - sets.c[0][0]}" height="22" rx="11"/>`;
+    const circ = (s) => sets.c.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r - s}"/>`).join('');
+    return `<svg width="${sets.w}" height="${sets.h}">
+      <g fill="#fff" stroke="#b9c3ea" stroke-width="5">${circ(0)}${base}</g>
+      <g fill="#fff">${circ(2.5)}<rect x="${sets.c[0][0]}" y="64.5" width="${sets.c[sets.c.length - 1][0] - sets.c[0][0]}" height="17" rx="8.5"/></g>
+      <g fill="none" stroke="#c9d0f0" stroke-width="2.5">${sets.c.slice(1, -1).map(([x, y, r]) => `<path d="M${x - r * .5} ${y + r * .1} a${r * .5} ${r * .5} 0 1 1 ${r * .5} ${r * .4}"/>`).join('')}</g>
+    </svg>`;
+  };
+  document.querySelectorAll('[data-cloud]').forEach(el => el.innerHTML = cloudSvg(el.dataset.cloud));
+
+  // 牡丹（キャンバスに一度だけ描く）
+  const PAL = {
+    pink:  ['#d9506f', '#f297ad', '#fde6ec'],
+    lav:   ['#7d6cc9', '#b3a5ea', '#eeeafc'],
+    sky:   ['#5c8fd8', '#a4c5f1', '#e8f1fd'],
+    peach: ['#e09040', '#f5c784', '#fff4de']
+  };
+  let seed = 11;
+  const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  function petal(g, a, hw, r, pal) {
+    g.save(); g.rotate(a);
+    const steps = 14, pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = -hw + (2 * hw) * i / steps;
+      const rr = r * (0.86 + 0.14 * Math.cos(t / hw * Math.PI / 2)) + Math.sin(i * 1.9 + a * 5) * r * 0.035;
+      pts.push([rr * Math.cos(t), rr * Math.sin(t)]);
+    }
+    g.beginPath(); g.moveTo(0, 0);
+    g.quadraticCurveTo(r * .45 * Math.cos(-hw * 1.5), r * .45 * Math.sin(-hw * 1.5), pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) {
+      const [px, py] = pts[i - 1], [x, y] = pts[i];
+      g.quadraticCurveTo(px * 1.03, py * 1.03, (px + x) / 2, (py + y) / 2);
+    }
+    g.lineTo(pts[steps][0], pts[steps][1]);
+    g.quadraticCurveTo(r * .45 * Math.cos(hw * 1.5), r * .45 * Math.sin(hw * 1.5), 0, 0);
+    const gr = g.createRadialGradient(0, 0, 0, 0, 0, r);
+    gr.addColorStop(0, pal[0]); gr.addColorStop(.5, pal[1]); gr.addColorStop(1, pal[2]);
+    g.fillStyle = gr;
+    g.shadowColor = 'rgba(110,34,64,.18)'; g.shadowBlur = 8;
+    g.fill();
+    g.shadowBlur = 0;
+    g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 1.4; g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 1;   // 筋
+    for (let k = -1; k <= 1; k++) { g.beginPath(); g.moveTo(r * .2, 0); g.quadraticCurveTo(r * .6, k * r * .1, r * .85, k * r * .22); g.stroke(); }
+    g.restore();
+  }
+  document.querySelectorAll('canvas.flower').forEach(c => {
+    const R = +c.dataset.r, pal = PAL[c.dataset.flower];
+    c.width = c.height = R * 2 + 30;
+    const g = c.getContext('2d');
+    g.translate(c.width / 2, c.height / 2);
+    const rings = [[1, 9, .62], [.82, 8, .62], [.64, 7, .64], [.47, 6, .66], [.3, 5, .7]];
+    rings.forEach(([rf, n, wf], k) => {
+      const off = rnd() * 6.28;
+      for (let i = 0; i < n; i++) petal(g, off + i * 6.283 / n + (rnd() - .5) * .15, Math.PI / n * wf * 1.6, R * rf * (0.94 + rnd() * .1), pal);
+    });
+    for (let i = 0; i < 22; i++) {   // しべ
+      const a = rnd() * 6.28, d = rnd() * R * .12;
+      g.fillStyle = i % 3 ? '#f4cf6a' : '#c99a3a';
+      g.beginPath(); g.arc(Math.cos(a) * d, Math.sin(a) * d, 1.6 + rnd() * 2, 0, 6.3); g.fill();
+    }
+  });
+}
+
+/* ---------- 文字（下帯・名前） ---------- */
+const defaults = {
+  inTag: '本日の対局',
+  inSub: '雀魂 × 日本プロ麻雀協会',
+  inTitle: 'まもなく開始',
+  inTicker: '華風戦 VPL応援同時視聴　／　ご視聴ありがとうございます！　／　コメントで一緒に応援しよう！',
+  inName1: '演者1', inName2: '演者2', inName3: '演者3', inName4: '演者4'
+};
+const outMap = { inTag: 'bandTag', inSub: 'bandSub', inTitle: 'bandTitle', inTicker: 'bandTicker' };
+function load(k, d) { try { return localStorage.getItem('kafu_' + k) ?? d; } catch (e) { return d; } }
+function save(k, v) { try { localStorage.setItem('kafu_' + k, v); } catch (e) {} }
+function show(id, v) {
+  if (outMap[id]) { document.getElementById(outMap[id]).textContent = v; return; }
+  const n = nameEls[+id.slice(-1) - 1];
+  n.textContent = v; n.classList.toggle('empty', !v.trim());
+}
+for (const id in defaults) {
+  const input = document.getElementById(id);
+  input.value = load(id, defaults[id]);
+  show(id, input.value);
+  input.oninput = () => { show(id, input.value); save(id, input.value); notify(); };
+}
+const band = document.getElementById('band'), bandFrame = document.getElementById('bandFrame'), bandBtn = document.getElementById('bandToggle');
+function setBand(on, persist = true) {
+  band.classList.toggle('hide', !on); bandFrame.classList.toggle('hide', !on);
+  bandBtn.classList.toggle('active', on);
+  bandBtn.textContent = on ? '表示中' : '非表示';
+  if (persist) { save('band', on ? '1' : '0'); notify(); }
+}
+bandBtn.onclick = () => setBand(band.classList.contains('hide'));
+setBand(load('band', '1') === '1', false);
+
+/* ---------- ルール ---------- */
+function setRule(r, persist = true) {
+  document.querySelectorAll('.rule').forEach(el => el.classList.toggle('show', el.id === 'rule' + r));
+  document.querySelectorAll('#controls button[data-rule]').forEach(b => b.classList.toggle('active', b.dataset.rule === r));
+  if (persist) { save('rule', r); notify(); }
+}
+document.querySelectorAll('#controls button[data-rule]').forEach(b => b.onclick = () => setRule(b.dataset.rule));
+setRule(load('rule', '0'), false);
+
+/* ---------- 他のページ（OBSドックの操作パネル等）からの変更を反映 ---------- */
+function refresh() {
+  for (const id in defaults) {
+    const input = document.getElementById(id), v = load(id, defaults[id]);
+    if (document.activeElement !== input) input.value = v;
+    show(id, v);
+  }
+  setBand(load('band', '1') === '1', false);
+  setRule(load('rule', '0'), false);
+}
+let bc = null;
+try { bc = new BroadcastChannel('kafu-overlay'); bc.onmessage = refresh; } catch (e) {}
+function notify() { if (bc) bc.postMessage('update'); }
+addEventListener('storage', e => { if (!e.key || e.key.startsWith('kafu_')) refresh(); });
+
+/* ---------- 舞い散る花びら＋金のきらめき ---------- */
+const cv = document.getElementById('petals');
+const ctx = cv.getContext('2d');
+const PCOL = [['#fbd3de', '#f08aa6'], ['#fde6ec', '#f4a6bb'], ['#e9e3fb', '#b4a6ea'], ['#fff1d6', '#f0c27a']];
+function newPetal(init) {
+  return {
+    x: Math.random() * 2100 - 100, y: init ? Math.random() * 1080 : -20,
+    s: 6 + Math.random() * 7, vy: 18 + Math.random() * 26, vx: 10 + Math.random() * 18,
+    sway: 20 + Math.random() * 40, ph: Math.random() * 6.28, rot: Math.random() * 6.28,
+    vr: (Math.random() - .5) * 1.6, flip: 1 + Math.random() * 2, c: PCOL[Math.random() * PCOL.length | 0],
+    a: .55 + Math.random() * .4
+  };
+}
+const petals = Array.from({ length: 46 }, () => newPetal(true));
+const sparks = Array.from({ length: 40 }, () => ({
+  x: Math.random() * 1920, y: Math.random() * 1080, r: 3 + Math.random() * 6,
+  tw: .6 + Math.random() * 1.6, ph: Math.random() * 6.28
+}));
+function drawPetal(p, t) {
+  const s = p.s;
+  ctx.save();
+  ctx.translate(p.x + Math.sin(t * .6 + p.ph) * p.sway, p.y);
+  ctx.rotate(p.rot);
+  ctx.scale(Math.cos(t * p.flip + p.ph), 1);
+  ctx.globalAlpha = p.a;
+  const g = ctx.createLinearGradient(0, -s, 0, s);
+  g.addColorStop(0, p.c[0]); g.addColorStop(1, p.c[1]);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(0, s);
+  ctx.bezierCurveTo(s * 1.1, s * .4, s * .75, -s * .9, s * .18, -s * .8);
+  ctx.lineTo(0, -s * .52);
+  ctx.lineTo(-s * .18, -s * .8);
+  ctx.bezierCurveTo(-s * .75, -s * .9, -s * 1.1, s * .4, 0, s);
+  ctx.fill();
+  ctx.restore();
+}
+function drawSpark(sp, t) {
+  const a = Math.max(0, Math.sin(t * sp.tw + sp.ph));
+  if (a < .05) return;
+  const r = sp.r * a;
+  ctx.save();
+  ctx.translate(sp.x, sp.y);
+  ctx.globalAlpha = a * .9;
+  ctx.fillStyle = '#e8c56c';
+  ctx.shadowColor = '#fff3c4'; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.moveTo(0, -r); ctx.quadraticCurveTo(0, 0, r, 0); ctx.quadraticCurveTo(0, 0, 0, r);
+  ctx.quadraticCurveTo(0, 0, -r, 0); ctx.quadraticCurveTo(0, 0, 0, -r);
+  ctx.fill();
+  ctx.restore();
+}
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const t = now / 1000;
+  ctx.clearRect(0, 0, 1920, 1080);
+  for (const sp of sparks) drawSpark(sp, t);
+  for (let i = 0; i < petals.length; i++) {
+    const p = petals[i];
+    p.y += p.vy * dt; p.x += p.vx * dt; p.rot += p.vr * dt;
+    if (p.y > 1100 || p.x > 2000) { petals[i] = newPetal(false); continue; }
+    drawPetal(p, t);
+  }
+  requestAnimationFrame(frame);
+}
+if (LAYER !== 'front' && !PANEL) requestAnimationFrame(frame); // 前面レイヤーは描かない
+</script>
+</body>
+</html>
