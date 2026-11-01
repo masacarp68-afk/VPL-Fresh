@@ -68,7 +68,7 @@
   #petals { position: absolute; inset: 0; }
 
   /* ===== 雀魂枠 ===== */
-  #game { position: absolute; left: 43px; top: 36px; width: 1456px; height: 819px; overflow: hidden; background: #000; }
+  #game { position: absolute; left: 20px; top: 22px; width: 1547px; height: 870px; overflow: hidden; background: #000; }
   #game iframe { width: 100%; height: 100%; border: 0; display: block; }   /* 枠のサイズで直接描画（くっきり） */
   body.hole #game { display: none; }
 
@@ -113,7 +113,7 @@
 
   /* ===== ルール ===== */
   .rule {
-    position: absolute; left: 43px; top: 36px; width: 1456px; height: 819px;
+    position: absolute; left: 20px; top: 22px; width: 1547px; height: 870px;
     opacity: 0; transform: scale(.96); transition: opacity .5s ease, transform .5s ease;
     background:
       radial-gradient(ellipse at 0% 100%, rgba(240,138,166,.25), transparent 55%),
@@ -326,8 +326,8 @@ function fit() { if (PANEL) return; document.getElementById('root').style.transf
 addEventListener('resize', fit); fit();
 
 /* ---------- レイアウト ---------- */
-const GAME = { x: 43, y: 36, w: 1456, h: 819 };   // 下の点数表示（y930〜）に被らない大きさ
-const CAM_RECTS = [36, 246, 456, 666].map(y => ({ x: 1539, y, w: 338, h: 190 }));   // 16:9・上詰め
+const GAME = { x: 20, y: 22, w: 1547, h: 870 };   // 下の点数表示（y930〜）に被らない大きさ
+const CAM_RECTS = [22, 243, 464, 685].map(y => ({ x: 1607, y, w: 293, h: 207 }));   // 雀魂枠と上下をそろえる
 const BAND = { x: 24, y: 940, w: 1872, h: 126 };   // 点数表示の場所（対局前の穴埋め）
 
 // 桜の花びら（角飾り用シンボル）
