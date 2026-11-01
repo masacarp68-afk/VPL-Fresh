@@ -68,7 +68,7 @@
   #petals { position: absolute; inset: 0; }
 
   /* ===== 雀魂枠 ===== */
-  #game { position: absolute; left: 50px; top: 62px; width: 1424px; height: 801px; overflow: hidden; background: #000; }
+  #game { position: absolute; left: 43px; top: 36px; width: 1456px; height: 819px; overflow: hidden; background: #000; }
   #game iframe { width: 100%; height: 100%; border: 0; display: block; }   /* 枠のサイズで直接描画（くっきり） */
   body.hole #game { display: none; }
 
@@ -85,6 +85,7 @@
     content: ""; position: absolute; inset: -12px; border: 3px solid;
     border-image: linear-gradient(90deg, var(--pink), var(--lav) 50%, var(--sky)) 1; opacity: .85;
   }
+  .kframe.small::after { display: none; }   /* カメラ枠・下帯は間隔が狭いので外線なし */
   .kframe svg.corner { position: absolute; width: 46px; height: 46px; }
   .kframe svg.corner.tl { left: -29px; top: -29px; }
   .kframe svg.corner.tr { right: -29px; top: -29px; }
@@ -103,23 +104,6 @@
     font-weight: 800; letter-spacing: 4px;
   }
 
-  /* ===== タイトル（右上） ===== */
-  #title { position: absolute; left: 1492px; top: 14px; width: 412px; height: 170px; text-align: center; }
-  #title .pill { height: 36px; padding: 0 30px 0 34px; font-size: 21px; margin-top: 4px; }
-  #title .main {
-    margin-top: 2px; font-family: "Yuji Boku", serif; font-size: 82px; line-height: 1.02; letter-spacing: 6px;
-    background: linear-gradient(180deg, #fff5cf 0%, #f2cf6e 38%, #c7922f 55%, #f6dc8e 78%, #b5822a 100%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-    -webkit-text-stroke: 1.5px #7a2a3c;
-    filter: drop-shadow(0 0 1px #fff) drop-shadow(2px 3px 0 #6e2240) drop-shadow(0 0 10px rgba(240,138,166,.65));
-  }
-  #title .sub {
-    margin-top: 2px; font-size: 31px; font-weight: 800; letter-spacing: 3px; white-space: nowrap;
-    background: linear-gradient(180deg, #9a3a5c, #5a1a36); -webkit-background-clip: text; background-clip: text; color: transparent;
-    filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 6px #fff);
-  }
-  #title .sub b { font-size: 38px; letter-spacing: 1px; margin-right: 4px; }
-
   /* ===== 演者の名前 ===== */
   .name {
     position: absolute; height: 34px; padding: 0 20px 0 24px; font-size: 20px; letter-spacing: 3px;
@@ -129,7 +113,7 @@
 
   /* ===== ルール ===== */
   .rule {
-    position: absolute; left: 50px; top: 62px; width: 1424px; height: 801px;
+    position: absolute; left: 43px; top: 36px; width: 1456px; height: 819px;
     opacity: 0; transform: scale(.96); transition: opacity .5s ease, transform .5s ease;
     background:
       radial-gradient(ellipse at 0% 100%, rgba(240,138,166,.25), transparent 55%),
@@ -147,34 +131,34 @@
 
   /* ===== 下帯（点数表示を出さない時用） ===== */
   #band {
-    position: absolute; left: 50px; top: 893px; width: 1424px; height: 165px; overflow: hidden;
+    position: absolute; left: 24px; top: 940px; width: 1872px; height: 126px; overflow: hidden;
     background: linear-gradient(180deg, rgba(255,252,246,.95), rgba(250,242,232,.95));
     transition: opacity .5s ease, transform .5s ease;
   }
   #band.hide { opacity: 0; transform: translateY(30px); }
   #bandFrame { transition: opacity .5s ease; }
   #bandFrame.hide { opacity: 0; }
-  #band .main { position: relative; height: 113px; display: flex; align-items: center; gap: 30px; padding: 0 40px; }
-  #band .pill { height: 54px; padding: 0 30px 0 34px; font-size: 28px; }
+  #band .main { position: relative; height: 80px; display: flex; align-items: center; gap: 30px; padding: 0 40px; }
+  #band .pill { height: 48px; padding: 0 28px 0 32px; font-size: 26px; }
   #band .sub { font-size: 30px; font-weight: 800; color: var(--wine); letter-spacing: 3px; white-space: nowrap; }
   #band .title {
-    font-family: "Yuji Boku", serif; font-size: 64px; letter-spacing: 6px; white-space: nowrap;
+    font-family: "Yuji Boku", serif; font-size: 54px; letter-spacing: 6px; white-space: nowrap;
     background: linear-gradient(180deg, #fff5cf 0%, #f2cf6e 38%, #c7922f 55%, #f6dc8e 78%, #b5822a 100%);
     -webkit-background-clip: text; background-clip: text; color: transparent;
     -webkit-text-stroke: 1.2px #7a2a3c;
     filter: drop-shadow(2px 2px 0 #6e2240) drop-shadow(0 0 8px rgba(240,138,166,.5));
   }
   #band .ticker {
-    position: relative; height: 52px; overflow: hidden; white-space: nowrap;
+    position: relative; height: 46px; overflow: hidden; white-space: nowrap;
     background: linear-gradient(90deg, rgba(240,138,166,.28), rgba(180,166,234,.28) 50%, rgba(156,196,240,.28));
     border-top: 2px solid var(--gold-l);
   }
   #band .ticker span {
-    position: absolute; top: 0; line-height: 50px; left: 100%;
+    position: absolute; top: 0; line-height: 44px; left: 100%;
     font-size: 25px; font-weight: 800; color: var(--wine); letter-spacing: 3px;
     animation: ticker 34s linear infinite;
   }
-  @keyframes ticker { to { transform: translateX(calc(-100% - 1424px)); } }
+  @keyframes ticker { to { transform: translateX(calc(-100% - 1872px)); } }
 
   /* ===== 操作パネル（1080px より下 = 配信には映らない） ===== */
   #controls {
@@ -298,13 +282,6 @@
   <!-- 枠・名前（JSで配置） -->
   <div id="frames" class="deco"></div>
 
-  <!-- タイトル -->
-  <div id="title" class="deco">
-    <div class="pill">チーム対抗戦</div>
-    <div class="main">華風戦</div>
-    <div class="sub"><b>VPL</b>応援同時視聴</div>
-  </div>
-
   <!-- 下帯 -->
   <div id="band" class="deco">
     <div class="main">
@@ -349,9 +326,9 @@ function fit() { if (PANEL) return; document.getElementById('root').style.transf
 addEventListener('resize', fit); fit();
 
 /* ---------- レイアウト ---------- */
-const GAME = { x: 50, y: 62, w: 1424, h: 801 };
-const CAM_RECTS = [196, 416, 636, 856].map(y => ({ x: 1508, y, w: 384, h: 200 }));
-const BAND = { x: 50, y: 893, w: 1424, h: 165 };
+const GAME = { x: 43, y: 36, w: 1456, h: 819 };   // 下の点数表示（y930〜）に被らない大きさ
+const CAM_RECTS = [36, 246, 456, 666].map(y => ({ x: 1539, y, w: 338, h: 190 }));   // 16:9・上詰め
+const BAND = { x: 24, y: 940, w: 1872, h: 126 };   // 点数表示の場所（対局前の穴埋め）
 
 // 桜の花びら（角飾り用シンボル）
 document.getElementById('sakuraPetals').innerHTML = [0, 72, 144, 216, 288].map(a =>
