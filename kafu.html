@@ -10,6 +10,7 @@
     使い方（OBS ブラウザソース 1920x1080）
     - kafu.html                … 左の大枠に雀魂（枠のサイズで直接描画）／右に演者カメラ枠4つ
     - kafu.html?game=0         … 雀魂枠を透明にする（下に雀魂のウィンドウキャプチャ等を置く）
+    - kafu.html?game=off       … 雀魂なし。枠の中は背景（開始前・休憩用。ルールや告知画像は出せる）
     - kafu.html?url=...        … iframe に読み込むURLを変更
     - 操作ボタンは 1080px より下（ソース高さ 1140 + 下 60px クロップで「対話」から操作）
     2枚重ね（カメラの後ろにも背景を出す）
@@ -70,7 +71,7 @@
   /* ===== 雀魂枠 ===== */
   #game { position: absolute; left: 20px; top: 22px; width: 1547px; height: 870px; overflow: hidden; background: #000; }
   #game iframe { width: 100%; height: 100%; border: 0; display: block; }   /* 枠のサイズで直接描画（くっきり） */
-  body.hole #game { display: none; }
+  body.hole #game, body.nogame #game { display: none; }
 
   /* ===== 枠：金の二重線＋パステルの外線＋角の花 ===== */
   .kframe {
@@ -313,10 +314,12 @@ const GAME_URL = params.get('url') || 'https://game.mahjongsoul.com/';
 const LAYER = params.get('layer');   // 'front' | 'back' | null
 const PANEL = params.get('panel') === '1';
 const HOLE = params.get('game') === '0';
+const NOGAME = params.get('game') === 'off';
+if (NOGAME) document.body.classList.add('nogame');
 if (PANEL) document.body.classList.add('panel');
 if (HOLE) document.body.classList.add('hole');
 if (LAYER) document.body.classList.add('layer-' + LAYER);
-if (!HOLE && LAYER !== 'back' && !PANEL) document.getElementById('gameFrame').src = GAME_URL;
+if (!HOLE && !NOGAME && LAYER !== 'back' && !PANEL) document.getElementById('gameFrame').src = GAME_URL;
 
 /* ---------- 画面フィット（横幅基準） ---------- */
 function fit() { if (PANEL) return; document.getElementById('root').style.transform = `scale(${innerWidth / 1920})`; }
