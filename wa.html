@@ -11,6 +11,7 @@
     - wa.html                … 左の枠に雀魂を表示（雀魂は内部 1920x1080 で描画して縮小）／カメラ枠3つ
     - wa.html?cams=2         … カメラ枠2つ（縦に大きめ）
     - wa.html?game=0         … 雀魂枠を透明にする（下に雀魂のウィンドウキャプチャ等を置く）
+    - wa.html?game=off       … 雀魂なし。枠の中は背景（開始前・休憩用）
     - wa.html?url=...        … iframe に読み込むURLを変更
     - 操作ボタンは 1080px より下（ソース高さ 1140 + 下 60px クロップで「対話」から操作）
     2枚重ね（カメラの後ろにも背景を出す）
@@ -63,7 +64,7 @@
     width: 1920px; height: 1080px; border: 0; display: block;
     transform: scale(0.696354); transform-origin: 0 0;
   }
-  body.hole #game { display: none; }
+  body.hole #game, body.nogame #game { display: none; }
 
   /* 金の二重線＋角の組子飾り */
   .gframe { position: absolute; border: 1.5px solid var(--gold); box-shadow: 0 0 0 5px rgba(0,0,0,.55), 0 0 0 6.5px var(--gold-l), 0 8px 30px rgba(0,0,0,.6); }
@@ -213,8 +214,10 @@ const CAMS = params.get('cams') === '2' ? 2 : 3;
 const HOLE = params.get('game') === '0';
 if (PANEL) document.body.classList.add('panel');
 if (HOLE) document.body.classList.add('hole');
+const NOGAME = params.get('game') === 'off';
+if (NOGAME) document.body.classList.add('nogame');
 if (LAYER) document.body.classList.add('layer-' + LAYER);
-if (!HOLE && LAYER !== 'back' && !PANEL) document.getElementById('gameFrame').src = GAME_URL;
+if (!HOLE && !NOGAME && LAYER !== 'back' && !PANEL) document.getElementById('gameFrame').src = GAME_URL;
 
 /* ---------- 画面フィット（横幅基準） ---------- */
 function fit() { if (PANEL) return; document.getElementById('root').style.transform = `scale(${innerWidth / 1920})`; }
