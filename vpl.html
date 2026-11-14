@@ -12,6 +12,7 @@
     - vpl.html?render=1920   … 雀魂を 1920x1080 で描画して縮小する旧方式
     - vpl.html?game=0        … 雀魂枠を透明にする（下に雀魂のウィンドウキャプチャ等を置く）
     - vpl.html?url=...       … iframe に読み込むURLを変更
+    - 雀魂枠の位置・大きさは操作パネルの「雀魂枠 X / Y / 幅」で調整（16:9 固定）
     - 操作ボタンは 1080px より下（ソース高さ 1140 + 下 60px クロップで「対話」から操作）
     2枚重ね（雀魂をウィンドウキャプチャで入れる時など）
     - vpl.html?layer=front   … 背景なし（枠・パネル・雀魂）→ カメラより上
@@ -52,12 +53,6 @@
   #bg {
     position: absolute; inset: 0; overflow: hidden;
     background: linear-gradient(160deg, #f3f8ff 0%, #e6f0ff 45%, #fdf0f8 100%);
-  }
-  body.hole:not(.layer-back) #bg {   /* 雀魂枠の穴 */
-    -webkit-mask: linear-gradient(#000,#000), linear-gradient(#000,#000) 550px 32px / 1312px 738px no-repeat;
-    -webkit-mask-composite: xor;
-    mask: linear-gradient(#000,#000), linear-gradient(#000,#000) 550px 32px / 1312px 738px no-repeat;
-    mask-composite: exclude;
   }
   .dots {
     position: absolute; inset: 0;
@@ -173,7 +168,7 @@
   body.panel #stage { display: none; }
   body.panel #root { position: static; width: auto; height: auto; transform: none !important; }
   body.panel #controls { position: static; width: auto; height: auto; padding: 14px; flex-direction: column; align-items: stretch; gap: 8px; }
-  body.panel #controls input, body.panel #controls textarea { width: 100%; font-size: 16px; }
+  body.panel #controls input, body.panel #controls textarea { width: 100%; font-size: 16px; box-sizing: border-box; }
   body.panel #controls textarea { height: 140px; }
   body.panel #controls button { align-self: flex-start; }
 
@@ -236,6 +231,10 @@
   左パネル：<button id="leftToggle" class="active">表示中</button>
   <input id="inHead" size="10" placeholder="見出し">
   <textarea id="inBody" rows="2" cols="36" placeholder="本文（改行可）"></textarea>
+  <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">雀魂枠 X<input id="inGx" type="number" step="2" style="width:64px">
+  Y<input id="inGy" type="number" step="2" style="width:56px">
+  幅<input id="inGw" type="number" step="8" style="width:64px"><input id="inGwR" type="range" min="640" max="1880" step="8" style="width:120px">
+  <button id="gameReset">戻す</button></div>
   ルール：<button data-rule="1">ルール1</button><button data-rule="2">ルール2</button><button data-rule="0" class="active">消</button>
 </div>
 </div>
@@ -280,6 +279,37 @@ function setLeft(show, persist = true) {
 leftBtn.onclick = () => setLeft(document.body.classList.contains('left-off'));
 setLeft(load('left', '1') === '1', false);
 
+/* ---------- 雀魂枠の位置・大きさ（16:9 のまま、枠・ルール・飾りも一緒に動く） ---------- */
+const GDEF = { x: 550, y: 32, w: 1312 };
+const gIn = { x: document.getElementById('inGx'), y: document.getElementById('inGy'), w: document.getElementById('inGw') };
+const gRange = document.getElementById('inGwR');
+function getGame() {
+  const w = Math.min(1920, Math.max(320, +load('gw', GDEF.w) || GDEF.w));
+  return { x: +load('gx', GDEF.x) || 0, y: +load('gy', GDEF.y) || 0, w, h: Math.round(w * 9 / 16) };
+}
+function applyGame() {
+  const g = getGame(), px = v => v + 'px', sc = g.w / 1920;
+  for (const el of [document.getElementById('game'), ...document.querySelectorAll('.rule')])
+    Object.assign(el.style, { left: px(g.x), top: px(g.y), width: px(g.w), height: px(g.h) });
+  document.querySelectorAll('.rule .inner').forEach(el => el.style.transform = `scale(${sc})`);
+  if (document.body.classList.contains('render1920')) document.getElementById('gameFrame').style.transform = `scale(${sc})`;
+  Object.assign(document.getElementById('gBorder').style, { left: px(g.x - 4), top: px(g.y - 4), width: px(g.w + 8), height: px(g.h + 8) });
+  Object.assign(document.getElementById('chipsTop').style, { left: px(g.x + 50), top: px(g.y - 18) });
+  Object.assign(document.getElementById('chipsBottom').style, { left: px(g.x + g.w - 250), top: px(g.y + g.h + 6) });
+  if (document.body.classList.contains('hole') && LAYER !== 'back') {   // 雀魂枠の穴
+    const m = `linear-gradient(#000,#000), linear-gradient(#000,#000) ${g.x}px ${g.y}px / ${g.w}px ${g.h}px no-repeat`;
+    const bg = document.getElementById('bg');
+    bg.style.webkitMask = m; bg.style.webkitMaskComposite = 'xor';
+    bg.style.mask = m; bg.style.maskComposite = 'exclude';
+  }
+  for (const k in gIn) if (document.activeElement !== gIn[k]) gIn[k].value = g[k];
+  if (document.activeElement !== gRange) gRange.value = g.w;
+}
+for (const k in gIn) gIn[k].oninput = () => { if (gIn[k].value !== '') { save('g' + k, gIn[k].value); applyGame(); notify(); } };
+gRange.oninput = () => { save('gw', gRange.value); applyGame(); notify(); };
+document.getElementById('gameReset').onclick = () => { for (const k in GDEF) save('g' + k, GDEF[k]); applyGame(); notify(); };
+applyGame();
+
 /* ---------- ルール表示 ---------- */
 function setRule(r, persist = true) {
   document.querySelectorAll('.rule').forEach(el => el.classList.toggle('show', el.id === 'rule' + r));
@@ -298,6 +328,7 @@ function refresh() {
   }
   setLeft(load('left', '1') === '1', false);
   setRule(load('rule', '0'), false);
+  applyGame();
 }
 let bc = null;
 try { bc = new BroadcastChannel('vpl-overlay'); bc.onmessage = refresh; } catch (e) {}
